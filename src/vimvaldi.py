@@ -4,6 +4,9 @@ import curses
 # cleaner code!
 from typing import Callable, Sequence, Tuple, Generator
 
+# utility functions
+import util
+
 
 class MenuItem:
     """A class for representing an item of a menu."""
@@ -22,11 +25,21 @@ class MenuSpacer(MenuItem):
 
 
 class Menu:
-    """A class for representing a menu."""
+    """A class for representing and working with a menu."""
 
-    def __init__(self, items: Sequence[MenuItem]):
-        self.index = 0  # currently selected item in the menu
+    def __init__(self, window, items: Sequence[MenuItem]):
+        self.index = 0
         self.items = items
+
+        # drawing-related variables
+        self.window = window
+        self.title = (
+            " __  __                  \n"
+            "|  \/  | ___ _ __  _   _ \n"
+            "| |\/| |/ _ \ '_ \| | | |\n"
+            "| |  | |  __/ | | | |_| |\n"
+            "|_|  |_|\___|_| |_|\__,_|"
+        ).split("\n")
 
     def _move_index(self, delta):
         """Moves the index of the menu by delta positions (ignoring spacers)."""
@@ -52,6 +65,35 @@ class Menu:
         """Returns True if the specified item matches the currently selected one."""
         return self.items[self.index] is item
 
+    def draw(self):
+        """Draw the menu to the window."""
+        self.window.clear()
+
+        height, width = self.window.getmaxyx()
+
+        y_off = util.center_coordinate(len(self.title) + 2 + len(self.items), height)
+
+        # draw the title of the menu
+        for i, line in enumerate(self.title):
+            x_off = util.center_coordinate(width, len(line))
+            self.window.addstr(i - y_off, x_off, line)
+
+        # draw the menu itself
+        for i, item in enumerate(self.items):
+            # ignore spacers
+            if type(item) is MenuSpacer:
+                continue
+
+            if self.is_selected(item):
+                label = f"> {item.label} <"
+            else:
+                label = item.label
+
+            x_off = util.center_coordinate(width, len(label))
+            self.window.addstr(i + len(self.title) + 2 - y_off, x_off, label)
+
+        self.window.refresh()
+
 
 class Interface:
     """A high-level class for rendering the Vimvaldi user interface."""
@@ -60,24 +102,30 @@ class Interface:
         """Initializes the interface."""
         # window setup
         self.window = window
-        self.resize_windows()
+        height, width = self.window.getmaxyx()
+        self.main_window = self.window.subwin(height - 1, 0, 0, 0)
+        self.status_window = self.window.subwin(height - 1, 0)
 
         curses.curs_set(0)
 
         self.initialize_colors()
 
-        # app menu setup
+        # initialize the interface components
         self.menu = Menu(
+            self.main_window,
             [
-                MenuItem("CREATE", lambda _: _, "Creates a new score."),
-                MenuItem("IMPORT", lambda _: _, "Imports a score from a file."),
+                MenuItem("CREATE", lambda: None, "Creates a new score."),
+                MenuItem("IMPORT", lambda: None, "Imports a score from a file."),
                 MenuSpacer(),
-                MenuItem("HELP", lambda _: _, "Displays program documentation."),
-                MenuItem("INFO", lambda _: _, "Shows information about the program."),
-            ]
+                MenuItem("HELP", lambda: None, "Displays program documentation."),
+                MenuItem("INFO", lambda: None, "Shows information about the program."),
+            ],
         )
 
-        # the state of the GUI
+        # status line setup
+        self.status_line = StatusLine(self.status_window)
+
+        # the state of the GUI; NOTE: possibly make this an enum?
         # 0) logo screen
         # 1) menu
         # 2) help/info screen (same thing, just different text)
@@ -89,73 +137,26 @@ class Interface:
 
     def run(self):
         """The main loop of the program."""
+        k = None
         while True:
-            k = None
+            self.resize_windows()
 
             if self.state == 0:
-                while k not in {curses.KEY_ENTER, 10, 13}:
-                    self.draw_logo()
-                    k = self.window.getch()
+                self.draw_logo()
 
-                # go to the menu after enter has been pressed
-                self.state = 1
+                if k in {curses.KEY_ENTER, 10, 13}:
+                    self.state = 1
 
             if self.state == 1:
-                self.display_menu()
+                if k is not None:
+                    if chr(k) == "j":
+                        self.menu.next()
+                    elif chr(k) == "k":
+                        self.menu.previous()
 
-                k = self.window.getch()
-                if chr(k) == "j":
-                    self.menu.next()
-                elif chr(k) == "k":
-                    self.menu.previous()
+                self.menu.draw()
 
-    def center_coordinate(self, a: int, b: int) -> int:
-        """Return the starting coordinate of an object of size a centered in an  object 
-        of size b. Note that the function can return negative values (if a > b)."""
-        return (a // 2) - (b // 2) - b % 2
-
-    def display_menu(self):
-        """Draw the menu to the main window."""
-        self.resize_windows()
-
-        menu_title = (
-            " __  __                  \n"
-            "|  \/  | ___ _ __  _   _ \n"
-            "| |\/| |/ _ \ '_ \| | | |\n"
-            "| |  | |  __/ | | | |_| |\n"
-            "|_|  |_|\___|_| |_|\__,_|"
-        ).split("\n")
-
-        height, width = self.main_window.getmaxyx()
-
-        y_off = self.center_coordinate(
-            len(menu_title) + 1 + len(self.menu.items), height
-        )
-
-        # draw the title
-        for i, line in enumerate(menu_title):
-            x_off = self.center_coordinate(width, len(line))
-            self.main_window.addstr(i - y_off, x_off, line)
-
-        # draw the menu itself
-        for i, item in enumerate(self.menu.items):
-            # ignore spacers
-            if type(item) is MenuSpacer:
-                continue
-
-            # if the current label is selected, draw its tooltip to the command window
-            if self.menu.is_selected(item):
-                label = f"> {item.label} <"
-                self.set_status_message(item.tooltip)
-            else:
-                label = item.label
-
-            x_off = self.center_coordinate(width, len(label))
-            self.main_window.addstr(i + len(menu_title) + 1 - y_off, x_off, label)
-
-    def set_status_message(self, message):
-        """Sets the status message of the command window."""
-        self.cmd_window.addstr(0, 0, message)
+            k = self.window.getch()
 
     def initialize_colors(self):
         """Initializes the colors used throughout the program 
@@ -168,14 +169,11 @@ class Interface:
             curses.init_pair(i + 1, i, -1)
 
     def resize_windows(self):
-        """Clears and resizes main and command windows to the appropriate sizes."""
+        """Resize the windows of the interface."""
         height, width = self.window.getmaxyx()
 
         self.main_window = self.window.subwin(height - 1, 0, 0, 0)
-        self.cmd_window = self.window.subwin(height - 1, 0)
-
-        self.main_window.clear()
-        self.cmd_window.clear()
+        self.status_window = self.window.subwin(height - 1, 0)
 
     def draw_logo(self) -> bool:
         """Draws the centered program logo on the main window. Return True if is was
