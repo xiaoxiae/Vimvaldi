@@ -1,0 +1,7 @@
+# ignore my Xournal++ notes
+*.xopp
+*.xopp~
+
+# Python cache files
+.mypy_cache
+__pycache__
