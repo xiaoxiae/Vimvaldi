@@ -78,11 +78,44 @@ class Interface:
             ]
         )
 
-    def center_coordinate(self, dimension: int, size: int) -> int:
-        """Return the starting coordinate of something of certain size."""
-        return int((dimension // 2) - (size // 2) - size % 2)
+        # the state of the GUI
+        # 0) logo screen
+        # 1) menu
+        # 2) help/info screen (same thing, just different text)
+        # 3) score
+        self.state = 0
 
-    def draw_menu(self):
+        # run the program
+        self.run()
+
+    def run(self):
+        """The main loop of the program."""
+        while True:
+            k = None
+
+            if self.state == 0:
+                while k not in {curses.KEY_ENTER, 10, 13}:
+                    self.draw_logo()
+                    k = self.window.getch()
+
+                # go to the menu after enter has been pressed
+                self.state = 1
+
+            if self.state == 1:
+                self.display_menu()
+
+                k = self.window.getch()
+                if chr(k) == "j":
+                    self.menu.next()
+                elif chr(k) == "k":
+                    self.menu.previous()
+
+    def center_coordinate(self, a: int, b: int) -> int:
+        """Return the starting coordinate of an object of size a centered in an  object 
+        of size b. Note that the function can return negative values (if a > b)."""
+        return (a // 2) - (b // 2) - b % 2
+
+    def display_menu(self):
         """Draw the menu to the main window."""
         self.resize_windows()
 
@@ -184,30 +217,5 @@ class Interface:
         return True
 
 
-def main(window):
-    """The program entry point."""
-    interface = Interface(window)
-
-    # draw the logo and wait for an enter press (could also be \n and \r -- 10, 13)
-    k = None
-    while k != curses.KEY_ENTER and k != 10 and k != 13:
-        if not interface.draw_logo():
-            break
-
-        k = window.getch()
-
-    window.clear()
-
-    k = None
-    while k != curses.KEY_ENTER and k != 10 and k != 13:
-        interface.draw_menu()
-
-        k = window.getch()
-        if chr(k) == "j":
-            interface.menu.next()
-        elif chr(k) == "k":
-            interface.menu.previous()
-
-
 if __name__ == "__main__":
-    curses.wrapper(main)
+    curses.wrapper(Interface)
