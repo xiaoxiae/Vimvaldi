@@ -95,6 +95,43 @@ class Menu:
         self.window.refresh()
 
 
+class StatusLine:
+    """A class for displaying information about the state of the program/parsing
+    the commands specified by the user."""
+
+    def __init__(self, window):
+        self.clear()
+        self.window = window
+        self.focused = False
+
+    def clear(self):
+        """Clears the status line."""
+        self.left_text, self.center_text, self.right_text = "", "", ""
+
+    def is_focused(self):
+        """Returns True if the status line is currently focused."""
+        return self.focused
+
+    def set_focus(self, value: bool = True):
+        """Sets the focus of the status line."""
+        self.focused = value
+
+    def draw(self):
+        """Draw the status line to the window."""
+        self.window.clear()
+
+        _, width = self.window.getmaxyx()
+
+        # draw left, center and right text
+        self.window.addstr(0, 0, self.left_text)
+        self.window.addstr(
+            0, util.center_coordinate(width, len(self.center_text)), self.center_text
+        )
+        self.window.addstr(0, width - len(self.right_text) - 1, self.right_text)
+
+        self.window.refresh()
+
+
 class Interface:
     """A high-level class for rendering the Vimvaldi user interface."""
 
