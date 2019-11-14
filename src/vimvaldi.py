@@ -8,7 +8,7 @@ from typing import Callable, Sequence, Tuple, Generator
 class MenuItem:
     """A class for representing an item of a menu."""
 
-    def __init__(self, label, action, tooltip):
+    def __init__(self, label: str, action: Callable, tooltip: str):
         self.label = label
         self.action = action
         self.tooltip = tooltip
@@ -18,7 +18,6 @@ class MenuSpacer(MenuItem):
     """A class for representing a spacer (ie. blank unselectable menu item)."""
 
     def __init__(self):
-        """Takes no arguments."""
         pass
 
 
@@ -30,10 +29,10 @@ class Menu:
         self.items = items
 
     def _move_index(self, delta):
-        """Moves the index of the menu by delta until it points to something that isn't spacer."""
+        """Moves the index of the menu by delta positions (ignoring spacers)."""
         self.index = (self.index + delta) % len(self.items)
 
-        # skip menu the spacers
+        # skip the spacers
         while type(self.items[self.index]) is MenuSpacer:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
@@ -70,11 +69,11 @@ class Interface:
         # app menu setup
         self.menu = Menu(
             [
-                MenuItem("CREATE", lambda _: _, "Opens a new score."),
+                MenuItem("CREATE", lambda _: _, "Creates a new score."),
                 MenuItem("IMPORT", lambda _: _, "Imports a score from a file."),
                 MenuSpacer(),
-                MenuItem("HELP", lambda _: _, "Opens program documentation"),
-                MenuItem("MISC", lambda _: _, "Opens information about the program."),
+                MenuItem("HELP", lambda _: _, "Displays program documentation."),
+                MenuItem("INFO", lambda _: _, "Shows information about the program."),
             ]
         )
 
@@ -140,6 +139,7 @@ class Interface:
 
         # draw the menu itself
         for i, item in enumerate(self.menu.items):
+            # ignore spacers
             if type(item) is MenuSpacer:
                 continue
 
