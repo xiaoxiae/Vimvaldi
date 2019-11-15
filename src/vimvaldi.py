@@ -57,9 +57,13 @@ class Menu:
         """Point to the previous item in the menu."""
         self._move_index(-1)
 
-    def select(self):
-        """Call the callable specified in the option tuple."""
-        self.options[self.index]()
+    def open(self):
+        """Run the action associated with the current menu item."""
+        return self.items[self.index].action()
+
+    def get_tooltip(self) -> str:
+        """Return the tooltip associated with the currently selected menu item."""
+        return self.items[self.index].tooltip
 
     def is_selected(self, item: MenuItem) -> bool:
         """Returns True if the specified item matches the currently selected one."""
@@ -140,8 +144,8 @@ class Interface:
         # window setup
         self.window = window
         height, width = self.window.getmaxyx()
-        self.main_window = self.window.subwin(height - 1, 0, 0, 0)
-        self.status_window = self.window.subwin(height - 1, 0)
+        self.main_window = self.window.derwin(height - 1, 0, 0, 0)
+        self.status_window = self.window.derwin(height - 1, 0)
 
         curses.curs_set(0)
 
@@ -176,7 +180,9 @@ class Interface:
         """The main loop of the program."""
         k = None
         while True:
-            self.resize_windows()
+            # check for window resize event
+            if k is not None and k == curses.KEY_RESIZE:
+                self.resize_windows()
 
             if self.state == 0:
                 self.draw_logo()
@@ -191,7 +197,10 @@ class Interface:
                     elif chr(k) == "k":
                         self.menu.previous()
 
+                self.status_line.center_text = self.menu.get_tooltip()
+
                 self.menu.draw()
+                self.status_line.draw()
 
             k = self.window.getch()
 
@@ -209,8 +218,8 @@ class Interface:
         """Resize the windows of the interface."""
         height, width = self.window.getmaxyx()
 
-        self.main_window = self.window.subwin(height - 1, 0, 0, 0)
-        self.status_window = self.window.subwin(height - 1, 0)
+        self.main_window.resize(height - 1, width)
+        self.status_window.mvwin(height - 1, 0)
 
     def draw_logo(self) -> bool:
         """Draws the centered program logo on the main window. Return True if is was
@@ -246,6 +255,7 @@ class Interface:
                     y + (height - len(logo_lines)) // 2,
                     x + (width - len(line)) // 2,
                     char,
+                    # 16 is color white; 3 is green
                     curses.color_pair(16 if char not in ("*") else 3),
                 )
 
