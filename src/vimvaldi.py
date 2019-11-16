@@ -129,7 +129,7 @@ class StatusLine:
     commands specified by the user."""
 
     def __init__(self, window):
-        self.text = ["", "", ""]  # left, center, right
+        self.text = ["", "", ""]  # left, center, right text
 
         self.window = window
         self.changed_since_redrawn = True
@@ -145,7 +145,6 @@ class StatusLine:
         """Sets the focus of the status line."""
         self.focused = value
 
-        # enable/disable the
         if self.is_focused():
             curses.curs_set(1)
             self.window.move(0, self.cursor_position)
@@ -154,45 +153,55 @@ class StatusLine:
             self.cursor_position = 0
 
     def set_text(self, position: Position, text: str):
-        """Change text at the specified position."""
+        """Change text at the specified position (left/center/right)."""
         self.text[position.value] = text
         self.changed_since_redrawn = True
 
     def get_text(self, position: Position) -> str:
-        """Return text at the specified position."""
+        """Return text at the specified position (left/center/right)."""
         return self.text[position.value]
+
+    def issue_command(self, command: str):
+        """Issue the specified command."""
 
     def handle_keypress(self, key: int):
         """Handles a single keypress."""
-        if key in (curses.KEY_BACKSPACE, 127):
-            self.text[0] = (
-                self.text[0][: self.cursor_position - 1]
-                + self.text[0][self.cursor_position :]
-            )
+        c_pos = self.cursor_position
 
-            self.cursor_position -= 1
-        elif key == curses.KEY_DC:
-            self.text[0] = (
-                self.text[0][: self.cursor_position]
-                + self.text[0][self.cursor_position + 1 :]
-            )
-        elif key == 27:  # escape
+        if key in (curses.KEY_BACKSPACE, 127):  # backspace
+            if c_pos > 1:
+                self.text[0] = self.text[0][: c_pos - 1] + self.text[0][c_pos:]
+                self.cursor_position -= 1
+
+        elif key == curses.KEY_DC:  # del
+            self.text[0] = self.text[0][:c_pos] + self.text[0][c_pos + 1 :]
+
+        elif key == 27:  # esc
             self.text[0] = ""
             self.set_focused(False)
-        elif key == curses.KEY_LEFT:
-            self.cursor_position = max(0, self.cursor_position - 1)
-        elif key == curses.KEY_RIGHT:
-            self.cursor_position = min(len(self.text[0]), self.cursor_position + 1)
-        elif key == curses.KEY_HOME:
-            self.cursor_position = 1  # 1, since the first char is :
-        elif key == curses.KEY_END:
+
+        elif key == curses.KEY_LEFT:  # move cursor left
+            self.cursor_position = max(1, c_pos - 1)
+
+        elif key == curses.KEY_RIGHT:  # move cursor right
+            self.cursor_position = min(len(self.text[0]), c_pos + 1)
+
+        elif key == curses.KEY_HOME:  # home
+            self.cursor_position = 1
+
+        elif key == curses.KEY_END:  # end
             self.cursor_position = len(self.text[0])
-        else:
-            self.text[0] = (
-                self.text[0][: self.cursor_position]
-                + chr(key)
-                + self.text[0][self.cursor_position :]
-            )
+
+        elif key == curses.KEY_END:  # end
+            self.cursor_position = len(self.text[0])
+
+        elif key in (curses.KEY_ENTER, 10, 13):  # enter
+            self.issue_command(self.text[0])
+            self.set_focused(False)
+            self.text[0] = ""
+
+        else:  # add the char to the command string
+            self.text[0] = self.text[0][:c_pos] + chr(key) + self.text[0][c_pos:]
             self.cursor_position += 1
 
         self.changed_since_redrawn = True
@@ -208,15 +217,16 @@ class StatusLine:
 
         _, width = self.window.getmaxyx()
 
-        self.window.addstr(0, 0, self.text[0])
+        left_offset = 0
+        center_offset = util.center_coordinate(width, len(self.text[1]))
+        right_offset = width - len(self.text[2]) - 1
 
-        # if the status line is focused, only draw the left line; if not, also draw rest
+        # if the status line is focused, only draw the left line
+        self.window.addstr(0, left_offset, self.text[0])
+
         if not self.is_focused():
-            self.window.addstr(
-                0, util.center_coordinate(width, len(self.text[1])), self.text[1]
-            )
-
-            self.window.addstr(0, width - len(self.text[2]) - 1, self.text[2])
+            self.window.addstr(0, center_offset, self.text[1])
+            self.window.addstr(0, right_offset, self.text[2])
 
         self.window.move(0, self.cursor_position)
 
