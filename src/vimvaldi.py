@@ -40,8 +40,9 @@ class Menu:
         self.index = 0
         self.items = items
 
-        # drawing-related variables
         self.window = window
+        self.changed_since_redrawn = True
+
         self.title = (
             " __  __                  \n"
             "|  \/  | ___ _ __  _   _ \n"
@@ -50,7 +51,7 @@ class Menu:
             "|_|  |_|\___|_| |_|\__,_|"
         ).split("\n")
 
-    def _move_index(self, delta):
+    def __move_index(self, delta):
         """Moves the index of the menu by delta positions (ignoring spacers)."""
         self.index = (self.index + delta) % len(self.items)
 
@@ -58,13 +59,15 @@ class Menu:
         while type(self.items[self.index]) is MenuSpacer:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
+        self.changed_since_redrawn = True
+
     def next(self):
         """Point to the next item in the menu."""
-        self._move_index(1)
+        self.__move_index(1)
 
     def previous(self):
         """Point to the previous item in the menu."""
-        self._move_index(-1)
+        self.__move_index(-1)
 
     def open(self):
         """Run the action associated with the current menu item."""
@@ -80,7 +83,12 @@ class Menu:
 
     def draw(self):
         """Draw the menu to the window."""
-        self.window.clear()
+        if not self.changed_since_redrawn:
+            return
+        else:
+            changed_since_redrawn = True
+
+        self.window.erase()
 
         height, width = self.window.getmaxyx()
 
@@ -116,7 +124,7 @@ class StatusLine:
         self.text = ["", "", ""]  # left, center, right
 
         self.window = window
-        self.focused = False
+        self.changed_since_redrawn = True
 
         self.focused = False
         self.cursor_position = 0
@@ -183,7 +191,12 @@ class StatusLine:
 
     def draw(self):
         """Draw the status line to the window."""
-        self.window.clear()
+        if not self.changed_since_redrawn:
+            return
+        else:
+            self.changed_since_redrawn = True
+
+        self.window.erase()
 
         _, width = self.window.getmaxyx()
 
