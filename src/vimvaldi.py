@@ -3,9 +3,18 @@ import curses
 
 # cleaner code!
 from typing import Callable, Sequence, Tuple, Generator
+from enum import Enum
 
 # utility functions
 import util
+
+
+class Position(Enum):
+    """An enum for storing information about the position of something."""
+
+    LEFT = 0
+    CENTER = 1
+    RIGHT = 2
 
 
 class MenuItem:
@@ -100,25 +109,77 @@ class Menu:
 
 
 class StatusLine:
-    """A class for displaying information about the state of the program/parsing
-    the commands specified by the user."""
+    """A class for displaying information about the state of the program/parsing the 
+    commands specified by the user."""
 
     def __init__(self, window):
-        self.clear()
+        self.text = ["", "", ""]  # left, center, right
+
         self.window = window
         self.focused = False
 
-    def clear(self):
-        """Clears the status line."""
-        self.left_text, self.center_text, self.right_text = "", "", ""
+        self.focused = False
+        self.cursor_position = 0
 
     def is_focused(self):
         """Returns True if the status line is currently focused."""
         return self.focused
 
-    def set_focus(self, value: bool = True):
+    def set_focused(self, value: bool = True):
         """Sets the focus of the status line."""
         self.focused = value
+
+        # enable/disable the
+        if self.is_focused():
+            curses.curs_set(1)
+            self.window.move(0, self.cursor_position)
+        else:
+            curses.curs_set(0)
+            self.cursor_position = 0
+
+    def set_text(self, position: Position, text: str):
+        """Change text at the specified position."""
+        self.text[position.value] = text
+        self.changed_since_redrawn = True
+
+    def get_text(self, position: Position) -> str:
+        """Return text at the specified position."""
+        return self.text[position.value]
+
+    def handle_keypress(self, key: int):
+        """Handles a single keypress."""
+        if key in (curses.KEY_BACKSPACE, 127):
+            self.text[0] = (
+                self.text[0][: self.cursor_position - 1]
+                + self.text[0][self.cursor_position :]
+            )
+
+            self.cursor_position -= 1
+        elif key == curses.KEY_DC:
+            self.text[0] = (
+                self.text[0][: self.cursor_position]
+                + self.text[0][self.cursor_position + 1 :]
+            )
+        elif key == 27:  # escape
+            self.text[0] = ""
+            self.set_focused(False)
+        elif key == curses.KEY_LEFT:
+            self.cursor_position = max(0, self.cursor_position - 1)
+        elif key == curses.KEY_RIGHT:
+            self.cursor_position = min(len(self.text[0]), self.cursor_position + 1)
+        elif key == curses.KEY_HOME:
+            self.cursor_position = 1  # 1, since the first char is :
+        elif key == curses.KEY_END:
+            self.cursor_position = len(self.text[0])
+        else:
+            self.text[0] = (
+                self.text[0][: self.cursor_position]
+                + chr(key)
+                + self.text[0][self.cursor_position :]
+            )
+            self.cursor_position += 1
+
+        self.changed_since_redrawn = True
 
     def draw(self):
         """Draw the status line to the window."""
@@ -126,13 +187,19 @@ class StatusLine:
 
         _, width = self.window.getmaxyx()
 
-        # draw left, center and right text
-        self.window.addstr(0, 0, self.left_text)
-        self.window.addstr(
-            0, util.center_coordinate(width, len(self.center_text)), self.center_text
-        )
-        self.window.addstr(0, width - len(self.right_text) - 1, self.right_text)
+        self.window.addstr(0, 0, self.text[0])
 
+        # if the status line is focused, only draw the left line; if not, also draw rest
+        if not self.is_focused():
+            self.window.addstr(
+                0, util.center_coordinate(width, len(self.text[1])), self.text[1]
+            )
+
+            self.window.addstr(0, width - len(self.text[2]) - 1, self.text[2])
+
+        self.window.move(0, self.cursor_position)
+
+        self.changed_since_redrawn = False
         self.window.refresh()
 
 
@@ -187,17 +254,31 @@ class Interface:
             if self.state == 0:
                 self.draw_logo()
 
-                if k in {curses.KEY_ENTER, 10, 13}:
+                # go to menu when enter is pressed (or \n or \r...)
+                if k in (curses.KEY_ENTER, 10, 13):
                     self.state = 1
 
             if self.state == 1:
                 if k is not None:
-                    if chr(k) == "j":
-                        self.menu.next()
-                    elif chr(k) == "k":
-                        self.menu.previous()
+                    if k == ord(":"):
+                        self.status_line.set_focused()
 
-                self.status_line.center_text = self.menu.get_tooltip()
+                    if not self.status_line.is_focused():
+                        if chr(k) == "j":
+                            self.menu.next()
+                        elif chr(k) == "k":
+                            self.menu.previous()
+                        elif k in (curses.KEY_ENTER, 10, 13, ord("l")):
+                            self.menu.open()
+
+                        self.status_line.set_text(
+                            Position.CENTER, self.menu.get_tooltip()
+                        )
+                    else:
+                        self.status_line.handle_keypress(k)
+
+                        if self.status_line.get_text(Position.LEFT) == "":
+                            self.status_line.set_focused(False)
 
                 self.menu.draw()
                 self.status_line.draw()
