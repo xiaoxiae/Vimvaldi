@@ -25,6 +25,22 @@ class InterfaceState(Enum):
     SCORE = 4  # the score editing
 
 
+class Drawable:
+    """A class to be extended by classes that write on the courses windows."""
+
+    def __init__(self, window):
+        self.window = window
+        self.changed = True
+
+    def get_changed(self) -> bool:
+        """Return True if the component changed since the last redraw."""
+        return self.changed
+
+    def set_changed(self, value):
+        """Set, whether the component has changed since last redraw or not."""
+        self.changed = value
+
+
 class MenuItem:
     """A class for representing an item of a menu."""
 
@@ -41,15 +57,14 @@ class MenuSpacer(MenuItem):
         pass
 
 
-class Menu:
+class Menu(Drawable):
     """A class for representing and working with a menu."""
 
     def __init__(self, window, items: Sequence[MenuItem]):
+        super(Menu, self).__init__(window)
+
         self.index = 0
         self.items = items
-
-        self.window = window
-        self.changed_since_redrawn = True
 
         self.title = (
             " __  __                  \n"
@@ -67,7 +82,7 @@ class Menu:
         while type(self.items[self.index]) is MenuSpacer:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
-        self.changed_since_redrawn = True
+        self.set_changed(True)
 
     def next(self):
         """Point to the next item in the menu."""
@@ -90,11 +105,8 @@ class Menu:
         return self.items[self.index] is item
 
     def draw(self):
-        """Draw the menu to the window."""
-        if not self.changed_since_redrawn:
+        if not self.get_changed():
             return
-        else:
-            changed_since_redrawn = True
 
         self.window.erase()
 
@@ -124,15 +136,14 @@ class Menu:
         self.window.refresh()
 
 
-class StatusLine:
+class StatusLine(Drawable):
     """A class for displaying information about the state of the program/parsing the 
     commands specified by the user."""
 
     def __init__(self, window):
-        self.text = ["", "", ""]  # left, center, right text
+        super(StatusLine, self).__init__(window)
 
-        self.window = window
-        self.changed_since_redrawn = True
+        self.text = ["", "", ""]  # left, center, right text
 
         self.focused = False
         self.cursor_position = 0
@@ -155,7 +166,7 @@ class StatusLine:
     def set_text(self, position: Position, text: str):
         """Change text at the specified position (left/center/right)."""
         self.text[position.value] = text
-        self.changed_since_redrawn = True
+        self.set_changed(True)
 
     def get_text(self, position: Position) -> str:
         """Return text at the specified position (left/center/right)."""
@@ -204,14 +215,11 @@ class StatusLine:
             self.text[0] = self.text[0][:c_pos] + chr(key) + self.text[0][c_pos:]
             self.cursor_position += 1
 
-        self.changed_since_redrawn = True
+        self.set_changed(True)
 
     def draw(self):
-        """Draw the status line to the window."""
-        if not self.changed_since_redrawn:
+        if not self.get_changed():
             return
-        else:
-            self.changed_since_redrawn = True
 
         self.window.erase()
 
@@ -230,7 +238,7 @@ class StatusLine:
 
         self.window.move(0, self.cursor_position)
 
-        self.changed_since_redrawn = False
+        self.set_changed(False)
         self.window.refresh()
 
 
