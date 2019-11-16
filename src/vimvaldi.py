@@ -223,9 +223,10 @@ class Interface:
         """Initializes the interface."""
         # window setup
         self.window = window
+
         height, width = self.window.getmaxyx()
-        self.main_window = self.window.derwin(height - 1, 0, 0, 0)
-        self.status_window = self.window.derwin(height - 1, 0)
+        self.main_window = self.window.derwin(height - 1, width, 0, 0)
+        self.status_window = self.window.derwin(1, width, height - 1, 0)
 
         curses.curs_set(0)
 
