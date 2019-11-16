@@ -17,6 +17,14 @@ class Position(Enum):
     RIGHT = 2
 
 
+class InterfaceState(Enum):
+    LOGO = 0  # the logo screen
+    MENU = 1  # the menu
+    HELP = 2  # the documentation page
+    INFO = 3  # the  info page
+    SCORE = 4  # the score editing
+
+
 class MenuItem:
     """A class for representing an item of a menu."""
 
@@ -232,7 +240,7 @@ class Interface:
 
         self.initialize_colors()
 
-        # initialize the interface components
+        # COMPONENT INITIALIZATION
         self.menu = Menu(
             self.main_window,
             [
@@ -244,15 +252,10 @@ class Interface:
             ],
         )
 
-        # status line setup
         self.status_line = StatusLine(self.status_window)
 
-        # the state of the GUI; NOTE: possibly make this an enum?
-        # 0) logo screen
-        # 1) menu
-        # 2) help/info screen (same thing, just different text)
-        # 3) score
-        self.state = 0
+        # the state of the GUI
+        self.state = InterfaceState.LOGO
 
         # run the program
         self.run()
@@ -265,14 +268,14 @@ class Interface:
             if k is not None and k == curses.KEY_RESIZE:
                 self.resize_windows()
 
-            if self.state == 0:
+            if self.state == InterfaceState.LOGO:
                 self.draw_logo()
 
                 # go to menu when enter is pressed (or \n or \r...)
                 if k in (curses.KEY_ENTER, 10, 13):
-                    self.state = 1
+                    self.state = InterfaceState.MENU
 
-            if self.state == 1:
+            if self.state == InterfaceState.MENU:
                 if k is not None:
                     if k == ord(":"):
                         self.status_line.set_focused()
