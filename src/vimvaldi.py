@@ -111,13 +111,13 @@ class Menu(Drawable):
 
     def handle_keypress(self, key: int):
         """Handles a single keypress."""
-        if key == ord("j"):
+        if key == "j":
             self.next()
 
-        if key == ord("k"):
+        if key == "k":
             self.previous()
 
-        if key in (curses.KEY_ENTER, 10, 13, ord("l")):
+        if key in (curses.KEY_ENTER, "\n", "\r", "l"):
             self.open()
 
     def draw(self):
@@ -194,14 +194,14 @@ class StatusLine(Drawable):
     def handle_keypress(self, key: int):
         """Handles a single keypress."""
         if not self.is_focused():
-            if key == ord(":"):
+            if key == ":":
                 self.set_focused(True)
             else:
                 return
 
         c_pos = self.cursor_position
 
-        if key in (curses.KEY_BACKSPACE, 127):  # backspace
+        if key in (curses.KEY_BACKSPACE, "\x7f"):  # backspace
             if c_pos > 1:
                 self.text[0] = self.text[0][: c_pos - 1] + self.text[0][c_pos:]
                 self.cursor_position -= 1
@@ -229,16 +229,13 @@ class StatusLine(Drawable):
         elif key == curses.KEY_END:  # end
             self.cursor_position = len(self.text[0])
 
-        elif key == curses.KEY_END:  # end
-            self.cursor_position = len(self.text[0])
-
-        elif key in (curses.KEY_ENTER, 10, 13):  # enter
+        elif key in (curses.KEY_ENTER, "\n", "\r"):  # enter
             self.issue_command(self.text[0])
             self.set_focused(False)
             self.text[0] = ""
 
         else:  # add the char to the command string
-            self.text[0] = self.text[0][:c_pos] + chr(key) + self.text[0][c_pos:]
+            self.text[0] = self.text[0][:c_pos] + str(key) + self.text[0][c_pos:]
             self.cursor_position += 1
 
         self.set_changed(True)
@@ -315,8 +312,7 @@ class Interface:
             if self.state == InterfaceState.LOGO:
                 self.draw_logo()
 
-                # go to menu when enter is pressed (or \n or \r...)
-                if k in (curses.KEY_ENTER, 10, 13):
+                if k in (curses.KEY_ENTER, "\n", "\r"):
                     self.state = InterfaceState.MENU
 
             if self.state == InterfaceState.MENU:
@@ -331,7 +327,7 @@ class Interface:
                 self.menu.draw()
                 self.status_line.draw()
 
-            k = self.window.getch()
+            k = self.window.get_wch()
 
     def initialize_colors(self):
         """Initializes the colors used throughout the program 
