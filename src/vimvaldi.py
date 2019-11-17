@@ -105,7 +105,7 @@ class Menu(Drawable):
         return self.items[self.index] is item
 
     def draw(self):
-        if not self.get_changed():
+        if not self.get_changed() and not self.window.is_wintouched():
             return
 
         self.window.erase()
@@ -218,7 +218,7 @@ class StatusLine(Drawable):
         self.set_changed(True)
 
     def draw(self):
-        if not self.get_changed():
+        if not self.get_changed() and not self.window.is_wintouched():
             return
 
         self.window.erase()
@@ -282,8 +282,8 @@ class Interface:
         """The main loop of the program."""
         k = None
         while True:
-            # check for window resize event
-            if k is not None and k == curses.KEY_RESIZE:
+            # handle window resize event
+            if k == curses.KEY_RESIZE:
                 self.resize_windows()
 
             if self.state == InterfaceState.LOGO:
