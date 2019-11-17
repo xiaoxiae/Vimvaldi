@@ -33,12 +33,17 @@ class Drawable:
         self.changed = True
 
     def get_changed(self) -> bool:
-        """Return True if the component changed since the last redraw."""
-        return self.changed
+        """Return True if the component needs to be redrawn."""
+        return self.changed or self.window.is_wintouched()
 
     def set_changed(self, value):
         """Set, whether the component has changed since last redraw or not."""
         self.changed = value
+
+    def refresh(self):
+        """Refreshes the Drawable."""
+        self.set_changed(False)
+        self.window.refresh()
 
 
 class MenuItem:
@@ -116,7 +121,7 @@ class Menu(Drawable):
             self.open()
 
     def draw(self):
-        if not self.get_changed() and not self.window.is_wintouched():
+        if not self.get_changed():
             return
 
         self.window.erase()
@@ -144,7 +149,7 @@ class Menu(Drawable):
             x_off = util.center_coordinate(width, len(label))
             self.window.addstr(i + len(self.title) + 2 - y_off, x_off, label)
 
-        self.window.refresh()
+        self.refresh()
 
 
 class StatusLine(Drawable):
@@ -239,7 +244,7 @@ class StatusLine(Drawable):
         self.set_changed(True)
 
     def draw(self):
-        if not self.get_changed() and not self.window.is_wintouched():
+        if not self.get_changed():
             return
 
         self.window.erase()
