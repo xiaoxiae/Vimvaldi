@@ -104,6 +104,17 @@ class Menu(Drawable):
         """Returns True if the specified item matches the currently selected one."""
         return self.items[self.index] is item
 
+    def handle_keypress(self, key: int):
+        """Handles a single keypress."""
+        if key == ord("j"):
+            self.next()
+
+        if key == ord("k"):
+            self.previous()
+
+        if key in (curses.KEY_ENTER, 10, 13, ord("l")):
+            self.open()
+
     def draw(self):
         if not self.get_changed() and not self.window.is_wintouched():
             return
@@ -177,12 +188,22 @@ class StatusLine(Drawable):
 
     def handle_keypress(self, key: int):
         """Handles a single keypress."""
+        if not self.is_focused():
+            if key == ord(":"):
+                self.set_focused(True)
+            else:
+                return
+
         c_pos = self.cursor_position
 
         if key in (curses.KEY_BACKSPACE, 127):  # backspace
             if c_pos > 1:
                 self.text[0] = self.text[0][: c_pos - 1] + self.text[0][c_pos:]
                 self.cursor_position -= 1
+            else:
+                if len(self.text[0]) == 1:
+                    self.text[0] = ""
+                    self.set_focused(False)
 
         elif key == curses.KEY_DC:  # del
             self.text[0] = self.text[0][:c_pos] + self.text[0][c_pos + 1 :]
@@ -294,26 +315,13 @@ class Interface:
                     self.state = InterfaceState.MENU
 
             if self.state == InterfaceState.MENU:
-                if k is not None:
-                    if k == ord(":"):
-                        self.status_line.set_focused()
+                self.status_line.handle_keypress(k)
 
-                    if not self.status_line.is_focused():
-                        if chr(k) == "j":
-                            self.menu.next()
-                        elif chr(k) == "k":
-                            self.menu.previous()
-                        elif k in (curses.KEY_ENTER, 10, 13, ord("l")):
-                            self.menu.open()
+                if not self.status_line.is_focused():
+                    self.menu.handle_keypress(k)
 
-                        self.status_line.set_text(
-                            Position.CENTER, self.menu.get_tooltip()
-                        )
-                    else:
-                        self.status_line.handle_keypress(k)
-
-                        if self.status_line.get_text(Position.LEFT) == "":
-                            self.status_line.set_focused(False)
+                # display tooltip when the status line isn't focused
+                self.status_line.set_text(Position.CENTER, self.menu.get_tooltip())
 
                 self.menu.draw()
                 self.status_line.draw()
