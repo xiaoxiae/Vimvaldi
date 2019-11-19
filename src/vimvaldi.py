@@ -1,9 +1,10 @@
-# terminal interaction
-import curses
-
 # cleaner code!
 from typing import Callable, Sequence, Tuple, Generator
+from dataclasses import dataclass
 from enum import Enum
+
+# terminal interaction
+import curses
 
 # utility functions
 import util
@@ -18,10 +19,12 @@ class Position(Enum):
 
 
 class InterfaceState(Enum):
+    """An enum for setting the state of the user interface."""
+
     LOGO = 0  # the logo screen
     MENU = 1  # the menu
     HELP = 2  # the documentation page
-    INFO = 3  # the  info page
+    INFO = 3  # the info page
     SCORE = 4  # the score editing
 
 
@@ -46,20 +49,13 @@ class Drawable:
         self.window.refresh()
 
 
+@dataclass
 class MenuItem:
     """A class for representing an item of a menu."""
 
-    def __init__(self, label: str, action: Callable, tooltip: str):
-        self.label = label
-        self.action = action
-        self.tooltip = tooltip
-
-
-class MenuSpacer(MenuItem):
-    """A class for representing a spacer (ie. blank unselectable menu item)."""
-
-    def __init__(self):
-        pass
+    label: str
+    action: Callable
+    tooltip: str
 
 
 class Menu(Drawable):
@@ -84,7 +80,7 @@ class Menu(Drawable):
         self.index = (self.index + delta) % len(self.items)
 
         # skip the spacers
-        while type(self.items[self.index]) is MenuSpacer:
+        while self.items[self.index] is None:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
         self.set_changed(True)
@@ -138,7 +134,7 @@ class Menu(Drawable):
         # draw the menu itself
         for i, item in enumerate(self.items):
             # ignore spacers
-            if type(item) is MenuSpacer:
+            if item is None:
                 continue
 
             if self.is_selected(item):
@@ -269,7 +265,6 @@ class Interface:
     """A high-level class for rendering the Vimvaldi user interface."""
 
     def __init__(self, window):
-        """Initializes the interface."""
         # window setup
         self.window = window
 
