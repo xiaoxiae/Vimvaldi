@@ -1,6 +1,7 @@
 # cleaner code!
 from typing import Callable, Sequence, Tuple, Generator
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from enum import Enum
 
 # terminal interaction
@@ -10,26 +11,8 @@ import curses
 import util
 
 
-class Position(Enum):
-    """An enum for storing information about the position of something."""
-
-    LEFT = 0
-    CENTER = 1
-    RIGHT = 2
-
-
-class InterfaceState(Enum):
-    """An enum for setting the state of the user interface."""
-
-    LOGO = 0  # the logo screen
-    MENU = 1  # the menu
-    HELP = 2  # the documentation page
-    INFO = 3  # the info page
-    SCORE = 4  # the score editing
-
-
-class Drawable:
-    """A class to be extended by classes that write on the courses windows."""
+class Drawable(ABC):
+    """A class to be extended by things that write on the courses windows."""
 
     def __init__(self, window):
         self.window = window
@@ -48,6 +31,25 @@ class Drawable:
         self.set_changed(False)
         self.window.refresh()
 
+    @abstractmethod
+    def draw():
+        """Does the drawing of the class on the window."""
+        pass
+
+
+class Controllable(Drawable, ABC):
+    """A class extending Drawable that uses StatusLine to execute commands."""
+
+    def __init__(self, window, status_line):
+        super().__init__(window)
+
+        self.status_line = status_line
+
+    @abstractmethod
+    def handle_keypress(self, key: int):
+        """Handles a single keypress."""
+        pass
+
 
 @dataclass
 class MenuItem:
@@ -58,11 +60,11 @@ class MenuItem:
     tooltip: str
 
 
-class Menu(Drawable):
+class Menu(Controllable):
     """A class for representing and working with a menu."""
 
-    def __init__(self, window, items: Sequence[MenuItem]):
-        super(Menu, self).__init__(window)
+    def __init__(self, window, status_line, items: Sequence[MenuItem]):
+        super().__init__(window, status_line)
 
         self.index = 0
         self.items = items
@@ -75,6 +77,8 @@ class Menu(Drawable):
             "|_|  |_|\___|_| |_|\__,_|"
         ).split("\n")
 
+        self.__move_index(0)  # a small workaround for setting the tooltip of statusline
+
     def __move_index(self, delta):
         """Moves the index of the menu by delta positions (ignoring spacers)."""
         self.index = (self.index + delta) % len(self.items)
@@ -82,6 +86,11 @@ class Menu(Drawable):
         # skip the spacers
         while self.items[self.index] is None:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
+
+        # display the tooltip of the current item
+        if not self.status_line.is_focused():
+            self.status_line.set_text(self.status_line.CENTER, self.get_tooltip())
+            self.status_line.set_changed(True)
 
         self.set_changed(True)
 
@@ -106,14 +115,17 @@ class Menu(Drawable):
         return self.items[self.index] is item
 
     def handle_keypress(self, key: int):
-        """Handles a single keypress."""
+        if self.status_line.is_focused():
+            self.handle_keypress()
+            return
+
         if key == "j":
             self.next()
 
-        if key == "k":
+        elif key == "k":
             self.previous()
 
-        if key in (curses.KEY_ENTER, "\n", "\r", "l"):
+        elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
             self.open()
 
     def draw(self):
@@ -152,6 +164,10 @@ class StatusLine(Drawable):
     """A class for displaying information about the state of the program/parsing the 
     commands specified by the user."""
 
+    LEFT = 0
+    CENTER = 1
+    RIGHT = 2
+
     def __init__(self, window):
         super(StatusLine, self).__init__(window)
 
@@ -175,17 +191,10 @@ class StatusLine(Drawable):
             curses.curs_set(0)
             self.cursor_position = 0
 
-    def set_text(self, position: Position, text: str):
+    def set_text(self, position: int, text: str):
         """Change text at the specified position (left/center/right)."""
-        self.text[position.value] = text
+        self.text[position] = text
         self.set_changed(True)
-
-    def get_text(self, position: Position) -> str:
-        """Return text at the specified position (left/center/right)."""
-        return self.text[position.value]
-
-    def issue_command(self, command: str):
-        """Issue the specified command."""
 
     def handle_keypress(self, key: int):
         """Handles a single keypress."""
@@ -257,12 +266,18 @@ class StatusLine(Drawable):
 
         self.window.move(0, self.cursor_position)
 
-        self.set_changed(False)
-        self.window.refresh()
+        self.refresh()
 
 
 class Interface:
     """A high-level class for rendering the Vimvaldi user interface."""
+
+    # the states of the interface -- might be modified later on
+    LOGO = 0
+    MENU = 1
+    HELP = 2
+    INFO = 3
+    SCORE = 4
 
     def __init__(self, window):
         # window setup
@@ -277,21 +292,24 @@ class Interface:
         self.initialize_colors()
 
         # COMPONENT INITIALIZATION
+        self.status_line = StatusLine(self.status_window)
+
         self.menu = Menu(
             self.main_window,
+            self.status_line,
             [
                 MenuItem("CREATE", lambda: None, "Creates a new score."),
                 MenuItem("IMPORT", lambda: None, "Imports a score from a file."),
-                MenuSpacer(),
+                None,
                 MenuItem("HELP", lambda: None, "Displays program documentation."),
                 MenuItem("INFO", lambda: None, "Shows information about the program."),
+                None,
+                MenuItem("QUIT", lambda: None, "Terminates the program."),
             ],
         )
 
-        self.status_line = StatusLine(self.status_window)
-
         # the state of the GUI
-        self.state = InterfaceState.LOGO
+        self.state = self.LOGO
 
         # run the program
         self.run()
@@ -304,22 +322,28 @@ class Interface:
             if k == curses.KEY_RESIZE:
                 self.resize_windows()
 
-            if self.state == InterfaceState.LOGO:
+            if self.state == self.LOGO:
                 self.draw_logo()
 
                 if k in (curses.KEY_ENTER, "\n", "\r"):
-                    self.state = InterfaceState.MENU
+                    self.state = self.MENU
 
-            if self.state == InterfaceState.MENU:
+            if self.state == self.MENU:
                 self.status_line.handle_keypress(k)
 
                 if not self.status_line.is_focused():
                     self.menu.handle_keypress(k)
 
-                # display tooltip when the status line isn't focused
-                self.status_line.set_text(Position.CENTER, self.menu.get_tooltip())
-
                 self.menu.draw()
+                self.status_line.draw()
+
+            if self.state == self.HELP:
+                self.status_line.handle_keypress(k)
+
+                if not self.status_line.is_focused():
+                    self.help_textdisplay.handle_keypress(k)
+
+                self.help_textdisplay.draw()
                 self.status_line.draw()
 
             k = self.window.get_wch()
