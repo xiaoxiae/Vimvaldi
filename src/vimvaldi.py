@@ -95,11 +95,6 @@ class Menu(Controllable):
         while self.items[self.index] is None:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
-        # display the tooltip of the current item
-        if not self.status_line.is_focused():
-            self.status_line.set_text(self.status_line.CENTER, self.get_tooltip())
-            self.status_line.set_changed(True)
-
         self.set_changed(True)
 
     def next(self):
@@ -124,7 +119,8 @@ class Menu(Controllable):
         if self.status_line.is_focused():
             return
         elif command != None:
-            pass
+            if command == ["q"]:
+                return ["quit"]
 
         if key == "j":
             self.next()
@@ -159,6 +155,11 @@ class Menu(Controllable):
             x_off = util.center_coordinate(width, len(label))
             self.window.addstr(i + len(self.title) + 2 - y_off, x_off, label)
 
+        # display the tooltip of the current item
+        if not self.status_line.is_focused():
+            self.status_line.set_text(self.status_line.CENTER, self.get_tooltip())
+            self.status_line.set_changed(True)
+
 
 class LogoDisplay(Controllable):
     """A very simple class for displaying the logo."""
@@ -180,7 +181,7 @@ class LogoDisplay(Controllable):
                     y + (height - len(self.text)) // 2,
                     x + (width - len(line)) // 2,
                     char,
-                    curses.color_pair(16 if char not in ("*") else 3),
+                    curses.color_pair(16 if char != "*" else 35),
                 )
 
         self.status_line.clear()
@@ -212,6 +213,9 @@ class TextDisplay(Controllable):
         # wrap the lines first (adding them to a list)
         wrapped = []
         for line in self.text:
+            if line == "":
+                wrapped.append("")
+
             while line != "":
                 previous_space = -1  # the index of the last space seen
                 i, char_count = 0, 0  # index in line + the number of actual chars
@@ -296,7 +300,8 @@ class TextDisplay(Controllable):
         if self.status_line.is_focused():
             return
         elif command != None:
-            pass
+            if command == ["q"]:
+                return ["quit"]
 
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
