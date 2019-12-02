@@ -10,6 +10,7 @@ import curses
 # utility functions
 import util
 import sys
+import re
 
 
 class Drawable(ABC):
@@ -186,6 +187,134 @@ class LogoDisplay(Controllable):
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         if key in (curses.KEY_ENTER, "\n", "\r"):
             return ["change_state", "menu"]
+
+
+class TextDisplay(Controllable):
+    """A class for working with a (scrollable) text display."""
+
+    def __init__(self, window, status_line, text: Sequence[str]):
+        super(TextDisplay, self).__init__(window, status_line)
+
+        self.text = text
+
+        self.line_offset = 0
+        self.side_offsets = [3, 1]  # left/right offset, top/bottom offset
+
+    def __get_content_space(self) -> Tuple[int, int]:
+        """Get the width and the height of the area that we can print on."""
+        height, width = self.window.getmaxyx()
+        return width - 2 * self.side_offsets[0], height - 2 * self.side_offsets[1]
+
+    def draw(self):
+        width, height = self.__get_content_space()
+
+        # wrap the lines first (adding them to a list)
+        wrapped = []
+        for line in self.text:
+            while line != "":
+                previous_space = -1  # the index of the last space seen
+                i, char_count = 0, 0  # index in line + the number of actual chars
+
+                # count the number of actual characters, until the width
+                while i < len(line) and char_count < width:
+                    if line[i] not in {"*", "/", "_"}:
+                        char_count += 1
+
+                        if line[i] == " ":
+                            previous_space = i
+                    i += 1
+
+                # if a space was found, wrap on it; else split on the word
+                # TODO: possibly split on other non-alpha characters
+                if previous_space != -1 and char_count == width:
+                    i = previous_space
+
+                wrapped.append(line[:i])
+                line = line[i:].strip()
+
+        # restrict the offset to valid values
+        self.line_offset = max(0, min(self.line_offset, len(wrapped) - height))
+
+        # 'flags' for displaying characters
+        bold = False
+        italics = False
+        underline = False
+
+        # level of indentation highlight for each line
+        highlight_level = 0
+
+        y = 0
+        for line in wrapped[self.line_offset : height + self.line_offset]:
+            x = 0
+
+            # count the highlight level
+            i = 0
+            while i < len(line) and line[i] == "#":
+                highlight_level += 1
+                i += 1
+
+            j = 0
+            for char in line:
+                if line[x + j] == "*":
+                    bold = not bold
+                    j += 1
+
+                elif line[x + j] == "/":
+                    italics = not italics
+                    j += 1
+
+                elif line[x + j] == "_":
+                    underline = not underline
+                    j += 1
+
+                else:
+                    self.window.addch(
+                        self.side_offsets[1] + y,
+                        self.side_offsets[0] + x,
+                        line[x + j],
+                        (curses.A_BOLD if bold else 0)
+                        | (curses.A_ITALIC if italics else 0)
+                        | (curses.A_UNDERLINE if underline else 0)
+                        | (
+                            curses.color_pair(highlight_level + 34)
+                            if highlight_level != 0
+                            else 0
+                        ),
+                    )
+
+                    x += 1
+
+            highlight_level = 0
+            y += 1
+
+        self.status_line.clear()
+
+    def handle_keypress(self, key: int) -> Union[None, List[str]]:
+        command = self.status_line.handle_keypress(key)
+
+        if self.status_line.is_focused() or command != None:
+            return
+
+        if key in ("j", curses.KEY_ENTER, "\n", "\r"):
+            self.line_offset += 1
+            self.set_changed(True)
+
+        if key == "k":
+            self.line_offset -= 1
+            self.set_changed(True)
+
+        if key == "q":
+            return ["quit"]
+
+        height = self.__get_content_space()[0]
+
+        if key == chr(4):  # ^D
+            self.line_offset += height // 6
+            self.set_changed(True)
+
+        if key == chr(21):  # ^U
+            self.line_offset -= height // 6
+            self.set_changed(True)
 
 
 class StatusLine(Drawable):
