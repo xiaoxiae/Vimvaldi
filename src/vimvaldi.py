@@ -123,6 +123,8 @@ class Menu(Controllable):
 
         if self.status_line.is_focused():
             return
+        elif command != None:
+            pass
 
         if key == "j":
             self.next()
@@ -291,8 +293,10 @@ class TextDisplay(Controllable):
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         command = self.status_line.handle_keypress(key)
 
-        if self.status_line.is_focused() or command != None:
+        if self.status_line.is_focused():
             return
+        elif command != None:
+            pass
 
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
