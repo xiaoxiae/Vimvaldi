@@ -390,6 +390,14 @@ class StatusLine(Drawable):
         elif key == curses.KEY_RIGHT:  # move cursor right
             self.cursor_position = min(len(self.text[0]), c_pos + 1)
 
+        elif key == 553:  # ctrl + left
+            space_pos = self.text[0].rfind(" ", 0, self.cursor_position - 1)
+            self.cursor_position = space_pos + 1 if space_pos != -1 else 1
+
+        elif key == 568:  # ctrl + right
+            space_pos = self.text[0].find(" ", self.cursor_position + 1)
+            self.cursor_position = space_pos if space_pos != -1 else len(self.text[0])
+
         elif key == curses.KEY_HOME:  # home
             self.cursor_position = 1
 
