@@ -166,7 +166,7 @@ class LogoDisplay(Controllable):
 
         self.text = text
 
-    def draw(self) -> bool:
+    def draw(self):
         """Draws the centered program logo on the main window."""
         self.window.clear()
 
@@ -178,7 +178,6 @@ class LogoDisplay(Controllable):
                     y + (height - len(self.text)) // 2,
                     x + (width - len(line)) // 2,
                     char,
-                    # 16 is color white; 3 is green
                     curses.color_pair(16 if char not in ("*") else 3),
                 )
 
@@ -356,6 +355,7 @@ class StatusLine(Drawable):
     def clear(self):
         """Clear all text from the StatusLine."""
         self.text = ["", "", ""]
+        self.set_changed(True)
 
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         if not self.is_focused():
@@ -363,6 +363,8 @@ class StatusLine(Drawable):
                 self.set_focused(True)
             else:
                 return
+
+        self.set_changed(True)
 
         c_pos = self.cursor_position
 
@@ -406,8 +408,6 @@ class StatusLine(Drawable):
         else:  # add the char to the command string
             self.text[0] = self.text[0][:c_pos] + str(key) + self.text[0][c_pos:]
             self.cursor_position += 1
-
-        self.set_changed(True)
 
     def draw(self):
         _, width = self.window.getmaxyx()
