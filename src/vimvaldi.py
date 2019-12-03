@@ -320,14 +320,14 @@ class TextDisplay(Controllable):
         if key == "q":
             return ["quit"]
 
-        height = self.__get_content_space()[0]
+        height = self.__get_content_space()[1]
 
         if key == chr(4):  # ^D
-            self.line_offset += height // 6
+            self.line_offset += height // 3
             self.set_changed(True)
 
         if key == chr(21):  # ^U
-            self.line_offset -= height // 6
+            self.line_offset -= height // 3
             self.set_changed(True)
 
 
