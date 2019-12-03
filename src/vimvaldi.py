@@ -569,8 +569,13 @@ class Interface:
         """Resize the windows of the interface."""
         height, width = self.window.getmaxyx()
 
-        self.main_window.resize(height - 1, width)
+        # Please, don't ask me why this is necessary. There seems to be an issue with
+        # simply moving the status window using mvin, but this seems to fix it (remove
+        # one of the lines and try for yourself by resizing the terminal).
+        self.status_window.mvderwin(height - 1, 0)
         self.status_window.mvwin(height - 1, 0)
+
+        self.main_window.resize(height - 1, width)
 
 
 if __name__ == "__main__":
