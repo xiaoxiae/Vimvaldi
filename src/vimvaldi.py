@@ -41,8 +41,8 @@ class Drawable(ABC):
 
     @abstractmethod
     def draw():
-        """Does the actual drawing; is called after draw() handles checking for changes
-        and erases the window."""
+        """Does the actual drawing; is called after refresh() handles checking for 
+        changes and erases the window."""
         pass
 
     @abstractmethod
@@ -116,11 +116,11 @@ class Menu(Controllable):
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         command = self.status_line.handle_keypress(key)
 
-        if self.status_line.is_focused():
-            return
-        elif command != None:
+        if self.status_line.is_focused() or command != None:
             if command == ["q"]:
                 return ["quit"]
+
+            return
 
         if key == "j":
             self.next()
@@ -244,12 +244,14 @@ class TextDisplay(Controllable):
         self.line_offset = max(0, min(self.line_offset, len(wrapped) - height))
 
         # 'flags' for displaying characters
-        bold = False
-        italics = False
-        underline = False
+        flags = {
+            "*": [False, curses.A_BOLD],
+            "/": [False, curses.A_ITALIC],
+            "_": [False, curses.A_UNDERLINE],
+        }
 
         # level of indentation highlight for each line
-        highlight_level = 0
+        h_level = 0
 
         y = 0
         for line in wrapped[self.line_offset : height + self.line_offset]:
@@ -258,44 +260,37 @@ class TextDisplay(Controllable):
             # count the highlight level
             i = 0
             while i < len(line) and line[i] == "#":
-                highlight_level += 1
+                h_level += 1
                 i += 1
 
             j = 0
             while x + j < len(line):
-                if line[x + j] == "*":
-                    bold = not bold
-                    j += 1
-
-                elif line[x + j] == "/":
-                    italics = not italics
-                    j += 1
-
-                elif line[x + j] == "_":
-                    underline = not underline
+                # possibly toggle flags
+                if line[x + j] in flags:
+                    flags[line[x + j]][0] = not flags[line[x + j]][0]
                     j += 1
 
                 else:
                     if line[x + j] == "\\":
                         j += 1
 
+                    # evaluate flags
+                    evaluated_flags = 0
+                    for flag in flags:
+                        evaluated_flags |= 0 if not flags[flag][0] else flags[flag][1]
+
+                    # place the char on the screen
                     self.window.addch(
                         self.side_offsets[1] + y,
                         self.side_offsets[0] + x,
                         line[x + j],
-                        (curses.A_BOLD if bold else 0)
-                        | (curses.A_ITALIC if italics else 0)
-                        | (curses.A_UNDERLINE if underline else 0)
-                        | (
-                            curses.color_pair(highlight_level + 34)
-                            if highlight_level != 0
-                            else 0
-                        ),
+                        evaluated_flags
+                        | (curses.color_pair(h_level + 34) if h_level != 0 else 0),
                     )
 
                     x += 1
 
-            highlight_level = 0
+            h_level = 0
             y += 1
 
         self.status_line.clear()
@@ -303,11 +298,11 @@ class TextDisplay(Controllable):
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         command = self.status_line.handle_keypress(key)
 
-        if self.status_line.is_focused():
-            return
-        elif command != None:
+        if self.status_line.is_focused() or command != None:
             if command == ["q"]:
                 return ["quit"]
+
+            return
 
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
