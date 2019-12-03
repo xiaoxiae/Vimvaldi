@@ -223,10 +223,13 @@ class TextDisplay(Controllable):
                 # count the number of actual characters, until the width
                 while i < len(line) and char_count < width:
                     if line[i] not in {"*", "/", "_"}:
-                        char_count += 1
-
                         if line[i] == " ":
                             previous_space = i
+
+                        elif line[i] == "\\":
+                            i += 1
+
+                        char_count += 1
                     i += 1
 
                 # if a space was found, wrap on it; else split on the word
@@ -259,7 +262,7 @@ class TextDisplay(Controllable):
                 i += 1
 
             j = 0
-            for char in line:
+            while x + j < len(line):
                 if line[x + j] == "*":
                     bold = not bold
                     j += 1
@@ -273,6 +276,9 @@ class TextDisplay(Controllable):
                     j += 1
 
                 else:
+                    if line[x + j] == "\\":
+                        j += 1
+
                     self.window.addch(
                         self.side_offsets[1] + y,
                         self.side_offsets[0] + x,
