@@ -545,8 +545,21 @@ class Interface:
                     self.control_state_stack[-1].set_changed(True)
 
             # redraw the component and the status line
-            self.control_state_stack[-1].refresh()
-            self.status_line.refresh()
+            # check for errors when drawing, possibly displaying the error message
+            try:
+                self.control_state_stack[-1].refresh()
+                self.status_line.refresh()
+            except curses.error:
+                height, width = self.window.getmaxyx()
+
+                error_text = "Terminal size too small!"[: width - 1]
+
+                self.window.clear()
+                self.window.addstr(
+                    height // 2,
+                    util.center_coordinate(width, len(error_text)),
+                    error_text,
+                )
 
             k = self.window.get_wch()
 
