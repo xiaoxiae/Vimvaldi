@@ -482,6 +482,28 @@ class Interface:
                     "     |__/' |_|_| |_| |_|\_/ \__._|_|\__,_|_|"
                 ).split("\n"),
             ),
+            "info": TextDisplay(
+                self.main_window,
+                self.status_line,
+                [
+                    r"# Info",
+                    r"The following page contains relevant information about the app.",
+                    r"",
+                    r"## History",
+                    r"This project was created as a semester project for the AP Programming Course at the Charles University (/http:\/\/mj.ucw.cz\/vyuka\/1920\/p1x\//).",
+                    r"",
+                    r"## Source Code",
+                    r"The code is licensed under MIT and freely available from /https:\/\/github.com\/xiaoxiae\/Vimvaldi\//, so feel free do whatever you want with it :-). Also feel free to submit a pull request if there's something you'd like to see changed or implemented!",
+                ],
+            ),
+            "help": TextDisplay(
+                self.main_window,
+                self.status_line,
+                [
+                    r"# Help",
+                    r"The following page contains instructions on using the app.",
+                ],
+            ),
             "menu": Menu(
                 self.main_window,
                 self.status_line,
