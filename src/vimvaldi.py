@@ -134,12 +134,12 @@ class Menu(Controllable):
     def draw(self):
         height, width = self.window.getmaxyx()
 
-        y_off = util.center_coordinate(len(self.title) + 2 + len(self.items), height)
+        y_off = util.center_coordinate(height, len(self.title) + 1 + len(self.items))
 
         # draw the title of the menu
         for i, line in enumerate(self.title):
             x_off = util.center_coordinate(width, len(line))
-            self.window.addstr(i - y_off, x_off, line)
+            self.window.addstr(y_off + i, x_off, line)
 
         # draw the menu itself
         for i, item in enumerate(self.items):
@@ -153,7 +153,7 @@ class Menu(Controllable):
                 label = item.label
 
             x_off = util.center_coordinate(width, len(label))
-            self.window.addstr(i + len(self.title) + 2 - y_off, x_off, label)
+            self.window.addstr(y_off + len(self.title) + 2 + i, x_off, label)
 
         # display the tooltip of the current item
         if not self.status_line.is_focused():
