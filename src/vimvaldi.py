@@ -117,10 +117,7 @@ class Menu(Controllable):
         command = self.status_line.handle_keypress(key)
 
         if self.status_line.is_focused() or command != None:
-            if command == ["q"]:
-                return ["quit"]
-
-            return
+            return command
 
         if key == "j":
             self.next()
@@ -295,10 +292,7 @@ class TextDisplay(Controllable):
         command = self.status_line.handle_keypress(key)
 
         if self.status_line.is_focused() or command != None:
-            if command == ["q"]:
-                return ["quit"]
-
-            return
+            return command
 
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
@@ -411,13 +405,16 @@ class StatusLine(Drawable):
             self.cursor_position = len(self.text[0])
 
         elif key in (curses.KEY_ENTER, "\n", "\r"):  # enter
-            command = self.text[0][1:]
+            command = self.text[0][1:].split()
+
+            # parsing of specific commands
+            if command == ["q"]:
+                return ["quit"]
 
             self.set_focused(False)
             self.text[0] = ""
 
-            # return the split command
-            return command.split()
+            return command
 
         else:  # add the char to the command string
             self.text[0] = self.text[0][:c_pos] + str(key) + self.text[0][c_pos:]
