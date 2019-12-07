@@ -411,12 +411,12 @@ class StatusLine(Drawable):
         elif key in (curses.KEY_ENTER, "\n", "\r"):  # enter
             command = self.text[0][1:].split()
 
+            self.set_focused(False)
+            self.text[0] = ""
+
             # parsing of specific commands
             if command == ["q"]:
                 return ["quit"]
-
-            self.set_focused(False)
-            self.text[0] = ""
 
             return command
 
