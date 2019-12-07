@@ -250,6 +250,7 @@ class TextDisplay(Controllable):
             "*": [False, curses.A_BOLD],
             "/": [False, curses.A_ITALIC],
             "_": [False, curses.A_UNDERLINE],
+            "~": [False, 0],  # special case for underline
         }
 
         y = 0
@@ -272,11 +273,14 @@ class TextDisplay(Controllable):
                     for flag in flags:
                         evaluated_flags |= 0 if not flags[flag][0] else flags[flag][1]
 
+                    # special case for strikethrough, since it's unicode
+                    char = (line[x + j] + "\u0336") if flags["~"][0] else line[x + j]
+
                     # place the char on the screen
-                    self.window.addch(
+                    self.window.addstr(
                         self.side_offsets[1] + y,
                         self.side_offsets[0] + x,
-                        line[x + j],
+                        char,
                         evaluated_flags
                         | (curses.color_pair(h_level + 34) if h_level != 0 else 0),
                     )
