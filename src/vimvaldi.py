@@ -499,6 +499,11 @@ class Interface:
                 [
                     r"# Help",
                     r"The following page contains instructions on using the app.",
+                    r"",
+                    r"## General commands (can be run from anywhere within the app)",
+                    r"_:help_       -- displays this page",
+                    r"_:info_       -- displays the info page",
+                    r"_:q_ or _:quit_ -- terminates the app",
                 ],
             ),
             "menu": Menu(
@@ -526,7 +531,7 @@ class Interface:
 
         # a stack with main window components, with the top one being the one currently
         # being displayed; we start with the logo
-        self.control_state_stack = [self.components["logo"]]
+        self.state_stack: List[Component] = [self.components["logo"]]
 
         # run the program
         self.run()
@@ -539,34 +544,45 @@ class Interface:
             if k == curses.KEY_RESIZE:
                 self.resize_windows()
 
-            command = self.control_state_stack[-1].handle_keypress(k)
+            command = self.state_stack[-1].handle_keypress(k)
 
             # handle commands sent by the components
             if command != None:
-                # relinquish the control from the current element to the next
-                if len(command) == 1 and command[0] == "quit":
-                    self.control_state_stack.pop()
+                if len(command) == 1:
+                    # quit command
+                    if command[0] == "quit":
+                        self.state_stack.pop()
 
-                    # when there's nothing to control, exit...
-                    if len(self.control_state_stack) == 0:
-                        sys.exit()
-                    else:
-                        self.control_state_stack[-1].set_changed(True)
+                        # when there's nothing to control, exit...
+                        if len(self.state_stack) == 0:
+                            sys.exit()
 
-                # change state -- remove the current one and add the specified one
-                elif len(command) == 2 and command[0] == "change_state":
-                    self.control_state_stack[-1] = self.components[command[1]]
-                    self.control_state_stack[-1].set_changed(True)
+                    # switch to help and info (if they aren't already in the stack)
+                    elif command[0] in ("help", "info"):
+                        # there can be only one text display in the stack at any time
+                        i = 0
+                        while i < len(self.state_stack):
+                            if type(self.state_stack[i]) is TextDisplay:
+                                self.state_stack.pop(i)
+                            i += 1
 
-                # change state append the specified one to the current one
-                elif len(command) == 2 and command[0] == "append_state":
-                    self.control_state_stack.append(self.components[command[1]])
-                    self.control_state_stack[-1].set_changed(True)
+                        self.state_stack.append(self.components[command[0]])
+
+                elif len(command) == 2:
+                    # changing the state of the app
+                    if command[0] == "change_state":
+                        self.state_stack[-1] = self.components[command[1]]
+
+                    # adding another state of the app
+                    elif command[0] == "append_state":
+                        self.state_stack.append(self.components[command[1]])
+
+                self.state_stack[-1].set_changed(True)
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying the error message
             try:
-                self.control_state_stack[-1].refresh()
+                self.state_stack[-1].refresh()
                 self.status_line.refresh()
             except curses.error:
                 height, width = self.window.getmaxyx()
