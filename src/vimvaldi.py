@@ -1,5 +1,5 @@
 # cleaner code!
-from typing import Callable, Sequence, Tuple, Generator, Union, List
+from typing import *
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -211,10 +211,15 @@ class TextDisplay(Controllable):
         width, height = self.__get_content_space()
 
         # wrap the lines first (adding them to a list)
-        wrapped = []
+        wrapped: List[Tuple[str, indent_level]] = []
         for line in self.text:
             if line == "":
-                wrapped.append("")
+                wrapped.append(("", 0))
+
+            # count the heading level (for coloring)
+            heading_level = 0
+            while heading_level < len(line) and line[heading_level] == "#":
+                heading_level += 1
 
             while line != "":
                 previous_space = -1  # the index of the last space seen
@@ -237,7 +242,7 @@ class TextDisplay(Controllable):
                 if previous_space != -1 and char_count == width:
                     i = previous_space
 
-                wrapped.append(line[:i])
+                wrapped.append((line[:i], heading_level))
                 line = line[i:].strip()
 
         # restrict the offset to valid values
@@ -250,18 +255,9 @@ class TextDisplay(Controllable):
             "_": [False, curses.A_UNDERLINE],
         }
 
-        # level of indentation highlight for each line
-        h_level = 0
-
         y = 0
-        for line in wrapped[self.line_offset : height + self.line_offset]:
+        for line, h_level in wrapped[self.line_offset : height + self.line_offset]:
             x = 0
-
-            # count the highlight level
-            i = 0
-            while i < len(line) and line[i] == "#":
-                h_level += 1
-                i += 1
 
             j = 0
             while x + j < len(line):
