@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
 
+# DEBUG
+import logging
+
+logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
+
 # terminal interaction
 import curses
 
@@ -11,6 +16,7 @@ import curses
 import util
 import sys
 import re
+from music import *
 
 
 class Drawable(ABC):
@@ -18,31 +24,24 @@ class Drawable(ABC):
 
     def __init__(self, window):
         self.window = window
-        self.changed = True
 
-    def get_changed(self) -> bool:
-        """Return True if the component needs to be redrawn."""
-        return self.changed or self.window.is_wintouched()
+        self.cursor_position = None
 
-    def set_changed(self, value):
-        """Set, whether the component has changed since last redraw or not."""
-        self.changed = value
+    def move_cursor(self):
+        """A function for setting the cursor position after redrawing the components."""
+        if self.cursor_position is not None:
+            self.window.move(*self.cursor_position)
 
     def refresh(self):
-        """Is called to possibly redraw of this Drawable (if anything changed)."""
-        if not self.get_changed():
-            return
-
+        """Is called to possibly redraw of this Drawable (if anything changed). Note
+        that the window.refresh() is not called here, since the cursor position will
+        change."""
         self.window.erase()
         self.draw()
 
-        self.set_changed(False)
-        self.window.refresh()
-
     @abstractmethod
     def draw():
-        """Does the actual drawing; is called after refresh() handles checking for 
-        changes and erases the window."""
+        """Does the actual drawing; is called inside self.refresh()."""
         pass
 
     @abstractmethod
@@ -52,8 +51,8 @@ class Drawable(ABC):
 
 
 class Controllable(Drawable, ABC):
-    """A class extending Drawable that uses StatusLine to execute commands. Is
-    essentially the stuff you see in the main screen."""
+    """A class extending Drawable that uses StatusLine to execute commands. It is
+    essentially the stuff you see on the main screen."""
 
     def __init__(self, window, status_line):
         super().__init__(window)
@@ -95,7 +94,7 @@ class Menu(Controllable):
         while self.items[self.index] is None:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
-        self.set_changed(True)
+        self.window.noutrefresh()
 
     def next(self):
         """Point to the next item in the menu."""
@@ -155,7 +154,6 @@ class Menu(Controllable):
         # display the tooltip of the current item
         if not self.status_line.is_focused():
             self.status_line.set_text(self.status_line.CENTER, self.get_tooltip())
-            self.status_line.set_changed(True)
 
 
 class LogoDisplay(Controllable):
@@ -290,8 +288,6 @@ class TextDisplay(Controllable):
             h_level = 0
             y += 1
 
-        self.status_line.clear()
-
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         command = self.status_line.handle_keypress(key)
 
@@ -300,11 +296,11 @@ class TextDisplay(Controllable):
 
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
-            self.set_changed(True)
+            self.window.noutrefresh()
 
         if key == "k":
             self.line_offset -= 1
-            self.set_changed(True)
+            self.window.noutrefresh()
 
         if key == "q":
             return ["quit"]
@@ -313,11 +309,89 @@ class TextDisplay(Controllable):
 
         if key == chr(4):  # ^D
             self.line_offset += height // 3
-            self.set_changed(True)
+            self.window.noutrefresh()
 
         if key == chr(21):  # ^U
             self.line_offset -= height // 3
-            self.set_changed(True)
+            self.window.noutrefresh()
+
+
+class Editor(Controllable):
+    """A class for working with the notes. This is the main class of the program."""
+
+    def __init__(self, window, status_line):
+        super(Editor, self).__init__(window, status_line)
+        self.score = None
+
+        self.side_offsets = [5, 1]  # left/right offset, top/bottom offset
+
+    def set_score(self, score: Score):
+        """Set the currently edited score."""
+        self.score = score
+
+    def handle_keypress(self, key: int) -> Union[None, List[str]]:
+        # special handling for insert commands
+        if key == "i" and not self.status_line.is_focused():
+            self.status_line.handle_keypress("INSERT")
+            return
+        else:
+            command = self.status_line.handle_keypress(key)
+
+        if command is not None and len(command) > 0 and command[0] == "insert":
+            if not self.score.insert(command[1]):
+                self.status_line.set_text(
+                    self.status_line.CENTER, "Incorrect identifier!"
+                )
+            else:
+                self.status_line.clear()
+
+        return command
+
+    def draw(self):
+        height, width = self.window.getmaxyx()
+
+        lines = 5
+
+        center = util.center_coordinate(height, lines)
+
+        # draw the 5 lines of a note sheet
+        for x in range(self.side_offsets[0], width - self.side_offsets[0]):
+            for y in range(center, center + lines):
+                self.window.addstr(y, x, " ", curses.A_UNDERLINE)
+
+        # draw the key
+        self.window.addstr(
+            center + lines // 2,
+            self.side_offsets[0] + 2,
+            self.score.clef,
+            curses.A_UNDERLINE,
+        )
+
+        # draw the time
+        for i, component in enumerate(self.score.time.split("/")):
+            self.window.addstr(
+                center + lines // 2 + i,
+                self.side_offsets[0] + 4,
+                component,
+                curses.A_UNDERLINE,
+            )
+
+        # draw the notes/rests/whatever
+        i = 6
+        for item in self.score:
+            if type(item) is Rest:
+                self.window.addstr(
+                    center + lines // 2,
+                    self.side_offsets[0] + i,
+                    str(item),
+                    curses.A_UNDERLINE,
+                )
+
+            i += 2
+
+        self.cursor_position = (5, 5)
+
+        duration = 0  # the accumulate duration of the items we encounter
 
 
 class StatusLine(Drawable):
@@ -334,7 +408,7 @@ class StatusLine(Drawable):
         self.text = ["", "", ""]  # left, center, right text
 
         self.focused = False
-        self.cursor_position = 0
+        self.cursor_offset = 0
 
     def is_focused(self):
         """Returns True if the status line is currently focused."""
@@ -344,38 +418,39 @@ class StatusLine(Drawable):
         """Sets the focus of the status line."""
         self.focused = value
 
-        if self.is_focused():
-            curses.curs_set(1)
-            self.window.move(0, self.cursor_position)
-        else:
-            curses.curs_set(0)
-            self.cursor_position = 0
+        # get rid of cursor control when the status line is no longer focused
+        if not self.focused:
+            self.cursor_position = None
 
     def set_text(self, position: int, text: str):
         """Change text at the specified position (left/center/right)."""
         self.text[position] = text
-        self.set_changed(True)
 
     def clear(self):
         """Clear all text from the StatusLine."""
         self.text = ["", "", ""]
-        self.set_changed(True)
 
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         if not self.is_focused():
             if key == ":":
                 self.set_focused(True)
+                self.cursor_offset = 0
+            elif key == "INSERT":  # special command
+                self.set_focused(True)
+                self.cursor_offset = 0
+
+                key = ">"
             else:
                 return
 
-        self.set_changed(True)
+        logging.info(ord(key))
 
-        c_pos = self.cursor_position
+        c_pos = self.cursor_offset
 
-        if key in (curses.KEY_BACKSPACE, "\x7f"):  # backspace
+        if key in (curses.KEY_BACKSPACE, "\x7f"):
             if c_pos > 1:
                 self.text[0] = self.text[0][: c_pos - 1] + self.text[0][c_pos:]
-                self.cursor_position -= 1
+                self.cursor_offset -= 1
             else:
                 if len(self.text[0]) == 1:
                     self.text[0] = ""
@@ -384,35 +459,42 @@ class StatusLine(Drawable):
         elif key == curses.KEY_DC:  # del
             self.text[0] = self.text[0][:c_pos] + self.text[0][c_pos + 1 :]
 
-        elif key == 27:  # esc
+        elif ord(key) == 27:  # esc
             self.text[0] = ""
             self.set_focused(False)
 
         elif key == curses.KEY_LEFT:  # move cursor left
-            self.cursor_position = max(1, c_pos - 1)
+            self.cursor_offset = max(1, c_pos - 1)
 
         elif key == curses.KEY_RIGHT:  # move cursor right
-            self.cursor_position = min(len(self.text[0]), c_pos + 1)
+            self.cursor_offset = min(len(self.text[0]), c_pos + 1)
 
         elif key == 553:  # ctrl + left
-            space_pos = self.text[0].rfind(" ", 0, self.cursor_position - 1)
-            self.cursor_position = space_pos + 1 if space_pos != -1 else 1
+            space_pos = self.text[0].rfind(" ", 0, self.cursor_offset - 1)
+            self.cursor_offset = space_pos + 1 if space_pos != -1 else 1
 
         elif key == 568:  # ctrl + right
-            space_pos = self.text[0].find(" ", self.cursor_position + 1)
-            self.cursor_position = space_pos if space_pos != -1 else len(self.text[0])
+            space_pos = self.text[0].find(" ", self.cursor_offset + 1)
+            self.cursor_offset = space_pos if space_pos != -1 else len(self.text[0])
 
         elif key == curses.KEY_HOME:  # home
-            self.cursor_position = 1
+            self.cursor_offset = 1
 
         elif key == curses.KEY_END:  # end
-            self.cursor_position = len(self.text[0])
+            self.cursor_offset = len(self.text[0])
 
         elif key in (curses.KEY_ENTER, "\n", "\r"):  # enter
-            command = self.text[0][1:].split()
+
+            text = self.text[0]
 
             self.set_focused(False)
             self.text[0] = ""
+
+            # insert parsing
+            if text[0] == ">":
+                return ["insert", text[1:]]
+
+            command = text[1:].split()
 
             # parsing of specific commands
             if command == ["q"]:
@@ -420,9 +502,9 @@ class StatusLine(Drawable):
 
             return command
 
-        else:  # add the char to the command string
+        elif len(str(key)) == 1:  # add the char to the command string
             self.text[0] = self.text[0][:c_pos] + str(key) + self.text[0][c_pos:]
-            self.cursor_position += 1
+            self.cursor_offset += 1
 
     def draw(self):
         _, width = self.window.getmaxyx()
@@ -431,13 +513,13 @@ class StatusLine(Drawable):
         center_offset = util.center_coordinate(width, len(self.text[1]))
         right_offset = width - len(self.text[2]) - 1
 
-        # if the status line is focused, only draw the left line
+        # if the status line is focused, only draw the left line (i.e. the command)
         self.window.addstr(0, left_offset, self.text[0])
         if not self.is_focused():
             self.window.addstr(0, center_offset, self.text[1])
             self.window.addstr(0, right_offset, self.text[2])
 
-        self.window.move(0, self.cursor_position)
+        self.cursor_position = (0, self.cursor_offset) if self.is_focused() else None
 
 
 class Interface:
@@ -451,7 +533,7 @@ class Interface:
         self.main_window = self.window.derwin(height - 1, width, 0, 0)
         self.status_window = self.window.derwin(1, width, height - 1, 0)
 
-        curses.curs_set(0)
+        curses.curs_set(0)  # disable cursor in the logo screen
 
         self.initialize_colors()
 
@@ -510,7 +592,7 @@ class Interface:
                 self.main_window,
                 self.status_line,
                 [
-                    MenuItem("CREATE", [], "Creates a new score."),
+                    MenuItem("CREATE", ["new"], "Creates a new score."),
                     MenuItem("IMPORT", [], "Imports a score from a file."),
                     None,
                     MenuItem(
@@ -527,6 +609,7 @@ class Interface:
                     MenuItem("QUIT", ["quit"], "Terminates the program."),
                 ],
             ),
+            "editor": Editor(self.main_window, self.status_line,),
         }
 
         # a stack with main window components, with the top one being the one currently
@@ -543,13 +626,12 @@ class Interface:
             # handle window resize event
             if k == curses.KEY_RESIZE:
                 self.resize_windows()
-
-            command = self.state_stack[-1].handle_keypress(k)
+            else:
+                command = self.state_stack[-1].handle_keypress(k)
 
             # handle commands sent by the components
             if command != None:
                 if len(command) == 1:
-                    # quit command
                     if command[0] == "quit":
                         self.state_stack.pop()
 
@@ -557,16 +639,19 @@ class Interface:
                         if len(self.state_stack) == 0:
                             sys.exit()
 
-                    # switch to help and info (if they aren't already in the stack)
-                    elif command[0] in ("help", "info"):
-                        # there can be only one text display in the stack at any time
-                        i = 0
-                        while i < len(self.state_stack):
-                            if type(self.state_stack[i]) is TextDisplay:
-                                self.state_stack.pop(i)
-                            i += 1
+                    elif command[0] in ("help", "info", "new"):
+                        while (
+                            len(self.state_stack) != 0
+                            and type(self.state_stack[-1]) is TextDisplay
+                        ):
+                            self.state_stack.pop()
 
-                        self.state_stack.append(self.components[command[0]])
+                        if command[0] == "new":
+                            self.components["editor"].set_score(Score())
+                            self.state_stack.append(self.components["editor"])
+                            self.status_line.clear()
+                        else:
+                            self.state_stack.append(self.components[command[0]])
 
                 elif len(command) == 2:
                     # changing the state of the app
@@ -577,17 +662,35 @@ class Interface:
                     elif command[0] == "append_state":
                         self.state_stack.append(self.components[command[1]])
 
-                self.state_stack[-1].set_changed(True)
-
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying the error message
             try:
+                # draw stuff on the component windows
                 self.state_stack[-1].refresh()
                 self.status_line.refresh()
+
+                # TODO: to be refactored, this isn't particularly pretty
+                if self.status_line.cursor_position is not None:
+                    curses.curs_set(1)
+                    self.state_stack[-1].window.refresh()
+                    self.status_line.move_cursor()
+                    self.status_line.window.refresh()
+
+                elif self.state_stack[-1].cursor_position is not None:
+                    curses.curs_set(1)
+                    self.status_line.window.refresh()
+                    self.state_stack[-1].move_cursor()
+                    self.state_stack[-1].window.refresh()
+
+                else:
+                    curses.curs_set(0)
+                    self.state_stack[-1].window.refresh()
+                    self.status_line.window.refresh()
+
             except curses.error:
                 height, width = self.window.getmaxyx()
 
-                error_text = "Terminal size too small!"[: width - 1]
+                error_text = "Screen size too small!"[: width - 1]
 
                 self.window.clear()
                 self.window.addstr(
