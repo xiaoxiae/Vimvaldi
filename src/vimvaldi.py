@@ -36,7 +36,7 @@ class Drawable(ABC):
         """Is called to possibly redraw of this Drawable (if anything changed). Note
         that the window.refresh() is not called here, since the cursor position will
         change."""
-        self.window.erase()
+        self.window.clear()
         self.draw()
 
     @abstractmethod
@@ -72,7 +72,7 @@ class MenuItem:
 class Menu(Controllable):
     """A class for representing and working with a menu."""
 
-    def __init__(self, window, status_line, items: Sequence[MenuItem]):
+    def __init__(self, window, status_line, items: Sequence[Union[None, MenuItem]]):
         super().__init__(window, status_line)
 
         self.index = 0
@@ -321,47 +321,64 @@ class Editor(Controllable):
 
     def __init__(self, window, status_line):
         super(Editor, self).__init__(window, status_line)
-        self.score = None
+        self.score = Score()
 
         self.side_offsets = [5, 1]  # left/right offset, top/bottom offset
-
-    def set_score(self, score: Score):
-        """Set the currently edited score."""
-        self.score = score
 
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         # special handling for insert commands
         if key == "i" and not self.status_line.is_focused():
-            self.status_line.handle_keypress("INSERT")
-            return
-        else:
-            command = self.status_line.handle_keypress(key)
+            key = "INSERT"
 
-        if command is not None and len(command) > 0 and command[0] == "insert":
-            if not self.score.insert(command[1]):
-                self.status_line.set_text(
-                    self.status_line.CENTER, "Incorrect identifier!"
-                )
-            else:
-                self.status_line.clear()
+        command = self.status_line.handle_keypress(key)
+
+        if not self.status_line.is_focused():
+            if key == "l":
+                self.score.next()
+
+            elif key == "h":
+                self.score.previous()
+
+        if command is not None:
+            if len(command) > 0 and command[0] == "insert":
+                if not self.score.insert(command[1]):
+                    self.status_line.set_text(
+                        self.status_line.CENTER, "Incorrect identifier!"
+                    )
+                else:
+                    self.status_line.clear()
 
         return command
 
     def draw(self):
         height, width = self.window.getmaxyx()
 
-        lines = 5
+        lines = 5  # number of lines in a note sheet
 
-        center = util.center_coordinate(height, lines)
+        heading = (
+            " _____    _   _            \n"
+            "| ____|__| |_| |_ ___  _ _ \n"
+            "|  _| / _` (_) __/ _ \| '_|\n"
+            "| |__| (_| | | || (_) | |  \n"
+            "|_____\__,_|_|\__\___/|_|  \n"
+            "                           "
+        ).split("\n")
+
+        center = util.center_coordinate(height, lines + len(heading))
+
+        # draw the title of the menu
+        for i, line in enumerate(heading):
+            x_off = util.center_coordinate(width, len(line))
+            self.window.addstr(center + i, x_off, line)
 
         # draw the 5 lines of a note sheet
         for x in range(self.side_offsets[0], width - self.side_offsets[0]):
             for y in range(center, center + lines):
-                self.window.addstr(y, x, " ", curses.A_UNDERLINE)
+                self.window.addstr(y + len(heading), x, " ", curses.A_UNDERLINE)
 
         # draw the key
         self.window.addstr(
-            center + lines // 2,
+            center + len(heading) + lines // 2,
             self.side_offsets[0] + 2,
             self.score.clef,
             curses.A_UNDERLINE,
@@ -370,28 +387,72 @@ class Editor(Controllable):
         # draw the time
         for i, component in enumerate(self.score.time.split("/")):
             self.window.addstr(
-                center + lines // 2 + i,
+                center + len(heading) + lines // 2 + i,
                 self.side_offsets[0] + 4,
                 component,
                 curses.A_UNDERLINE,
             )
 
+        # draw the 5 lines of a note sheet
+        for y in range(center + 1, center + lines):
+            self.window.addstr(
+                y + len(heading), self.side_offsets[0] + 6, "|", curses.A_UNDERLINE
+            )
+
         # draw the notes/rests/whatever
-        i = 6
-        for item in self.score:
+        x = 8  # position from left offset
+        i = 0  # position in the score
+        duration = 0.0  # the accumulate duration of notes
+        cursor_position = None
+
+        while i < len(self.score):
+            item = self.score[i]
+
+            # don't draw outside screen
+            if x + 2 * self.side_offsets[0] > width:
+                break
+
+            # if the duration accumulated to 1, draw a vertical bar
+            if duration == 1:
+                duration = 0
+                for y in range(center + 1, center + lines):
+                    self.window.addstr(
+                        y + len(heading),
+                        self.side_offsets[0] + x,
+                        "|",
+                        curses.A_UNDERLINE,
+                    )
+
+                x += 2
+                continue
+
             if type(item) is Rest:
                 self.window.addstr(
-                    center + lines // 2,
-                    self.side_offsets[0] + i,
+                    center + len(heading) + lines // 2,
+                    self.side_offsets[0] + x,
                     str(item),
                     curses.A_UNDERLINE,
                 )
 
-            i += 2
+            # possibly move the cursor accordingly
+            if i == self.score.position:
+                cursor_position = (
+                    center + len(heading) + lines // 2,
+                    self.side_offsets[0] + x,
+                )
 
-        self.cursor_position = (5, 5)
+            # the duration of notes is 1 = whole, 2 = half...
+            duration += 1 / item.duration
+            x += 2
+            i += 1
 
-        duration = 0  # the accumulate duration of the items we encounter
+        if cursor_position is not None:
+            self.cursor_position = cursor_position
+        else:
+            self.cursor_position = (
+                center + len(heading) + lines // 2,
+                self.side_offsets[0] + x,
+            )
 
 
 class StatusLine(Drawable):
@@ -418,7 +479,7 @@ class StatusLine(Drawable):
         """Sets the focus of the status line."""
         self.focused = value
 
-        # get rid of cursor control when the status line is no longer focused
+        # get rid of cursor control when the status line is no longer in focus
         if not self.focused:
             self.cursor_position = None
 
@@ -443,8 +504,6 @@ class StatusLine(Drawable):
             else:
                 return
 
-        logging.info(ord(key))
-
         c_pos = self.cursor_offset
 
         if key in (curses.KEY_BACKSPACE, "\x7f"):
@@ -459,7 +518,7 @@ class StatusLine(Drawable):
         elif key == curses.KEY_DC:  # del
             self.text[0] = self.text[0][:c_pos] + self.text[0][c_pos + 1 :]
 
-        elif ord(key) == 27:  # esc
+        elif type(key) is str and ord(key) == 27:  # esc
             self.text[0] = ""
             self.set_focused(False)
 
@@ -609,7 +668,7 @@ class Interface:
                     MenuItem("QUIT", ["quit"], "Terminates the program."),
                 ],
             ),
-            "editor": Editor(self.main_window, self.status_line,),
+            "editor": Editor(self.main_window, self.status_line),
         }
 
         # a stack with main window components, with the top one being the one currently
@@ -631,6 +690,7 @@ class Interface:
 
             # handle commands sent by the components
             if command != None:
+                # commands of length one
                 if len(command) == 1:
                     if command[0] == "quit":
                         self.state_stack.pop()
@@ -640,6 +700,7 @@ class Interface:
                             sys.exit()
 
                     elif command[0] in ("help", "info", "new"):
+                        # remove all text displays, if a new one should open up
                         while (
                             len(self.state_stack) != 0
                             and type(self.state_stack[-1]) is TextDisplay
@@ -647,7 +708,6 @@ class Interface:
                             self.state_stack.pop()
 
                         if command[0] == "new":
-                            self.components["editor"].set_score(Score())
                             self.state_stack.append(self.components["editor"])
                             self.status_line.clear()
                         else:
@@ -657,35 +717,39 @@ class Interface:
                     # changing the state of the app
                     if command[0] == "change_state":
                         self.state_stack[-1] = self.components[command[1]]
+                        self.status_line.clear()
 
                     # adding another state of the app
                     elif command[0] == "append_state":
                         self.state_stack.append(self.components[command[1]])
+                        self.status_line.clear()
 
             # redraw the component and the status line
-            # check for errors when drawing, possibly displaying the error message
+            # check for errors when drawing, possibly displaying an error message
             try:
-                # draw stuff on the component windows
+                # refresh the virtual component screen
                 self.state_stack[-1].refresh()
                 self.status_line.refresh()
 
-                # TODO: to be refactored, this isn't particularly pretty
-                if self.status_line.cursor_position is not None:
-                    curses.curs_set(1)
-                    self.state_stack[-1].window.refresh()
-                    self.status_line.move_cursor()
-                    self.status_line.window.refresh()
+                # positions of the cursor
+                main_cp = self.state_stack[-1].cursor_position
+                status_cp = self.status_line.cursor_position
 
-                elif self.state_stack[-1].cursor_position is not None:
-                    curses.curs_set(1)
-                    self.status_line.window.refresh()
-                    self.state_stack[-1].move_cursor()
-                    self.state_stack[-1].window.refresh()
+                self.state_stack[-1].window.refresh()
+                self.status_line.window.refresh()
 
+                if main_cp is not None or status_cp is not None:
+                    curses.curs_set(1)
+
+                    if status_cp is not None:
+                        self.status_line.move_cursor()
+                        self.status_line.window.refresh()
+
+                    elif main_cp is not None:
+                        self.state_stack[-1].move_cursor()
+                        self.state_stack[-1].window.refresh()
                 else:
                     curses.curs_set(0)
-                    self.state_stack[-1].window.refresh()
-                    self.status_line.window.refresh()
 
             except curses.error:
                 height, width = self.window.getmaxyx()
