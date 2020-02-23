@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import *
+from copy import deepcopy
 
 from collections import namedtuple
 from util import *
@@ -114,7 +115,7 @@ class Rest:
     def from_identifier(cls, identifier: str) -> Union[Rest, None]:
         """Returns a Rest object initialized from an identifier."""
         # check for rest symbol and 0-length rest
-        if identifier[-1] != "r" or identifier[0] == "0":
+        if len(identifier) == 0 or identifier[-1] != "r" or identifier[0] == "0":
             return
 
         # parse the number
@@ -156,15 +157,90 @@ class Score:
     def __len__(self) -> int:
         return len(self.notes)
 
+    def next(self):
+        """Point to the next item in the menu."""
+        if self.position != len(self.notes):
+            self.position += 1
+
+    def split(self, item, duration) -> List[type(item)]:
+        """Takes an item and 1/duration that the item should fit and returns a list of
+        items that evenly fit this duration."""
+        d = 1
+        items = []
+
+        while duration > 0:
+            if d <= duration:
+                i = deepcopy(item)
+                i.duration = int(1 / d)
+                items.append(i)
+                duration -= d
+
+            d /= 2
+
+        return items
+
+    def previous(self):
+        """Point to the previous item in the menu."""
+        if self.position != 0:
+            self.position -= 1
+
+    def remove(self) -> bool:
+        """Replace the next non-rest string with a rest. If there are rests of length 1
+        one after another, remove them all."""
+        total = 0
+
+        for i in range(self.position, len(self.notes)):
+            # if it's not a rest, replace it and return
+            if type(self.notes[i]) is not Rest:
+                self.notes[i] = Rest(self.notes[i].duration)
+                return
+
+            total += 1 / self.notes[i].duration
+
+            if total == 1:
+                # pop all of the rests that add up to 1
+                for _ in range(self.position, i + 1):
+                    self.notes.pop(self.position)
+
+                return
+
     def insert(self, string) -> bool:
         """Add an item to the score, returning True if something was added."""
-        # try to parse each of the
+        # try to parse as each of the types of things to put in a notesheet
         for c in [Note, Rest]:
             item = c.from_identifier(string)
 
             if item is not None:
-                self.notes.insert(self.position, item)
-                self.position += 1
+                # if we're not adding to the end of the note editor, add padding rests
+                if self.position != len(self.notes):
+                    # TODO
+                    return
+
+                remaining_duration = sum(1 / n.duration for n in self.notes) % 1
+
+                # if the rest/note fits in the current bar, simply add it
+                if remaining_duration + 1 / item.duration <= 1:
+                    self.notes.insert(self.position, item)
+                    self.position += 1
+
+                else:
+                    # duration before and after the bar
+                    before_duration = 1 - remaining_duration
+                    after_duration = 1 / item.duration - (1 - remaining_duration)
+
+                    # split into multiple items
+                    before_items = self.split(item, before_duration)
+                    after_items = self.split(item, after_duration)
+
+                    # add the items to the note sheet
+                    self.notes = (
+                        self.notes[: self.position]
+                        + before_items
+                        + after_items
+                        + self.notes[self.position :]
+                    )
+
+                    self.position += len(before_items) + len(after_items)
 
                 return True
 

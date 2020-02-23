@@ -339,6 +339,9 @@ class Editor(Controllable):
             elif key == "h":
                 self.score.previous()
 
+            elif key == "x":
+                self.score.remove()
+
         if command is not None:
             if len(command) > 0 and command[0] == "insert":
                 if not self.score.insert(command[1]):
