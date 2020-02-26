@@ -183,11 +183,6 @@ class Score:
     def __len__(self) -> int:
         return len(self.notes)
 
-    def next(self):
-        """Point to the next item in the menu."""
-        if self.position != len(self.notes):
-            self.position += 1
-
     def split(self, item, duration) -> List[NoteLike]:
         """Takes an item and 1/duration that the item should fit and returns a list of
         items that evenly fit this duration."""
@@ -205,10 +200,23 @@ class Score:
 
         return items
 
+    def next(self):
+        """Point to the next item in the menu."""
+        if self.position != len(self.notes):
+            self.position += 1
+
     def previous(self):
         """Point to the previous item in the menu."""
         if self.position != 0:
             self.position -= 1
+
+    def first(self):
+        """Point to the first item in the menu."""
+        self.position = 0
+
+    def last(self):
+        """Point to the last item in the menu."""
+        self.position = len(self.notes)
 
     def remove(self) -> bool:
         """Attempt to remove the thing at the current position (happens only if we

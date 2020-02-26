@@ -325,6 +325,8 @@ class Editor(Controllable):
 
         self.side_offsets = [5, 1]  # left/right offset, top/bottom offset
 
+        self.key_stack = []
+
     def handle_keypress(self, key: int) -> Union[None, List[str]]:
         # special handling for insert commands
         if key == "i" and not self.status_line.is_focused():
@@ -332,27 +334,39 @@ class Editor(Controllable):
 
         command = self.status_line.handle_keypress(key)
 
-        if not self.status_line.is_focused():
-            if key == "l":
-                self.score.next()
+        if command is None:
+            if not self.status_line.is_focused():
+                if len(self.key_stack) == 0:
+                    if key == "l":
+                        self.score.next()
 
-            elif key == "h":
-                self.score.previous()
+                    elif key == "h":
+                        self.score.previous()
 
-            elif key == "x":
-                if not self.score.remove():
-                    self.status_line.set_text(self.status_line.CENTER, "Not allowed!")
+                    elif key == "g":
+                        self.key_stack.append("g")
+
+                    elif key == "G":
+                        self.score.last()
+
+                    elif key == "x":
+                        if not self.score.remove():
+                            self.status_line.set_text(
+                                self.status_line.CENTER, "Not allowed!"
+                            )
+                    else:
+                        self.key_stack = []
                 else:
-                    self.status_line.clear()
+                    if key == "g" and self.key_stack[-1] == "g":
+                        self.score.first()
 
-        if command is not None:
+                    self.key_stack.pop()
+        else:
             if len(command) > 0 and command[0] == "insert":
                 if not self.score.insert(command[1]):
                     self.status_line.set_text(
                         self.status_line.CENTER, "Incorrect identifier!"
                     )
-                else:
-                    self.status_line.clear()
 
         return command
 
@@ -460,6 +474,9 @@ class Editor(Controllable):
             x += 2
             i += 1
 
+        self.status_line.set_text(self.status_line.RIGHT, "".join(self.key_stack))
+
+        # update cursor position
         if cursor_position is not None:
             self.cursor_position = cursor_position
         else:
