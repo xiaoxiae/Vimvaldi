@@ -340,7 +340,10 @@ class Editor(Controllable):
                 self.score.previous()
 
             elif key == "x":
-                self.score.remove()
+                if not self.score.remove():
+                    self.status_line.set_text(self.status_line.CENTER, "Not allowed!")
+                else:
+                    self.status_line.clear()
 
         if command is not None:
             if len(command) > 0 and command[0] == "insert":

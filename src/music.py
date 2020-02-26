@@ -211,24 +211,27 @@ class Score:
             self.position -= 1
 
     def remove(self) -> bool:
-        """Replace the next non-rest string with a rest. If there are rests of length 1
-        one after another, remove them all."""
-        total = 0
+        """Attempt to remove the thing at the current position (happens only if we
+        don't mess up the rest of the score."""
+        if self.position == len(self.notes):
+            return False
 
-        for i in range(self.position, len(self.notes)):
-            # if it's not a rest, replace it and return
-            if type(self.notes[i]) is not Rest:
-                self.notes[i] = Rest(self.notes[i].get_duration())
-                return
+        duration = 0
+        for note in self.notes:
+            # don't add the duration of the note that is to be removed
+            if note is not self.notes[self.position]:
+                duration += 1 / note.get_duration()
 
-            total += 1 / self.notes[i].get_duration()
+            # if the durations don't work out, return
+            if duration > 1:
+                return False
 
-            if total == 1:
-                # pop all of the rests that add up to 1
-                for _ in range(self.position, i + 1):
-                    self.notes.pop(self.position)
+            # else we're good
+            elif duration == 1:
+                duration = 0
 
-                return
+        self.notes.pop(self.position)
+        return True
 
     def insert(self, string) -> bool:
         """Add an item to the score, returning True if something was added."""
