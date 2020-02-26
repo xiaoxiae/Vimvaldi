@@ -101,7 +101,7 @@ class Note(NoteLike):
 
         # get pitch
         pitch, identifier = pop_char(identifier)
-        if pitch not in "cdefgah":
+        if pitch not in ("c", "d", "e", "f", "g", "a", "h"):
             return
 
         # check for flats/sharps
@@ -111,6 +111,7 @@ class Note(NoteLike):
             sharp = identifier[0] == "e"
             identifier = identifier[2:]
 
+        # check for octave
         octave, identifier = pop_number(identifier)
         if octave == 0:
             octave = 1
@@ -171,11 +172,11 @@ class Score:
         self.clef = clef
         self.time = time
 
-        self.notes: List[Union[Note, Rest]] = []
+        self.notes: List[NoteLike] = []
 
         self.position = 0
 
-    def __getitem__(self, i) -> Union[Note, Rest, None]:
+    def __getitem__(self, i) -> Union[NoteLike, None]:
         """Returns the i-th item from the Score."""
         return self.notes[i]
 
@@ -187,7 +188,7 @@ class Score:
         if self.position != len(self.notes):
             self.position += 1
 
-    def split(self, item, duration) -> List[type(item)]:
+    def split(self, item, duration) -> List[NoteLike]:
         """Takes an item and 1/duration that the item should fit and returns a list of
         items that evenly fit this duration."""
         d = 1
