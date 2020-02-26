@@ -17,33 +17,6 @@ class Notation:
     """A class for storing musical notation symbols used in the program."""
 
     Clef = namedtuple("Clef", ["TREBLE", "ALTO", "BASS"])("𝄞", "𝄡", "𝄢")
-
-    Note = namedtuple(
-        "Note",
-        [
-            "WHOLE",
-            "HALF",
-            "QUARTER",
-            "EIGHT",
-            "SIXTEENTH",
-            "THIRTY_SECOND",
-            "SIXTY_FOURTH",
-        ],
-    )("𝅝", "𝅗𝅥", "𝅘𝅥", "𝅘𝅥𝅮", "𝅘𝅥𝅯", "𝅘𝅥𝅰", "𝅘𝅥𝅱")
-
-    Rest = namedtuple(
-        "Rest",
-        [
-            "WHOLE",
-            "HALF",
-            "QUARTER",
-            "EIGHT",
-            "SIXTEENTH",
-            "THIRTY_SECOND",
-            "SIXTY_FOURTH",
-        ],
-    )("𝄻", "𝄼", "𝄽", "𝄾", "𝄿", "𝅀", "𝅁")
-
     Accidental = namedtuple("Accidental", ["FLAT", "NATURAL", "SHARP"],)("♭", "♮", "♯")
 
     Dynamics = namedtuple(
@@ -58,84 +31,136 @@ class Notation:
             return f"{num}/{den}"
 
 
+class NoteLike:
+    """A class representing a thing with Rest and Note-like attributes (duration, dot,
+    could have a crescendo/...)."""
+
+    def __init__(
+        self, duration, symbols, dotted=False, crescendo=False, decrescendo=False
+    ):
+        self.duration = duration
+        self.symbols = symbols
+
+        self.dotted = dotted
+        self.crescendo = crescendo
+        self.decrescendo = decrescendo
+
+    def get_duration(self, ignore_dot=False):
+        """The duration of the note-like object (including the dot)."""
+        return self.duration * (1 if not self.dotted or ignore_dot else (2 / 3))
+
+    def __str__(self):
+        """The string representation of the note-like object."""
+        return self.symbols[int(log(self.get_duration(ignore_dot=True), 2))]
+
+
 @dataclass
-class Note:
+class Note(NoteLike):
     """A class for interpreting a note."""
 
-    pitch: Tuple[str, int]
-    duration: int
+    def __init__(self, duration, pitch, dotted=False, flat=False, sharp=False):
+        super().__init__(
+            duration,
+            namedtuple(
+                "Note",
+                [
+                    "WHOLE",
+                    "HALF",
+                    "QUARTER",
+                    "EIGHT",
+                    "SIXTEENTH",
+                    "THIRTY_SECOND",
+                    "SIXTY_FOURTH",
+                ],
+            )("𝅝", "𝅗𝅥", "𝅘𝅥", "𝅘𝅥𝅮", "𝅘𝅥𝅯", "𝅘𝅥𝅰", "𝅘𝅥𝅱"),
+            dotted=dotted,
+        )
+
+        self.pitch = pitch
+
+        self.flat = flat
+        self.sharp = sharp
 
     @classmethod
     def from_identifier(cls, identifier: str) -> Union[Note, None]:
         """Returns a Note object initialized from an identifier in the following form:
 
-                               [<duration>][<pitch>][.]
+                               [<duration>]<pitch>[is/es][<octave>][.]
 
-        The arguments mean the following (+ is optional, - is mandatory):
-        + duration -- the duration of the note (1 is whole, 2 is half...)
-        - pitch -- the pitch of the note (c/d/e/f/g/a/h), with a few possible additions:
-            + is/es for sharps and flats
-            + ''' or ',' may be added (even repeatedly), indicating the octave
-            + . for a dotted note
-
-        Returns None if the parsing of the identifier was unsuccessful.
+        - duration -- the duration of the note (1 is whole, 2 is half...); defaults to 4
+        - pitch -- the pitch of the note (c/d/e/f/g/a/h)
+        - octave -- the octave of the node; defaults to 1
         """
 
-        # parse the number
-        number, i = 0, 0
-        while i < len(identifier) and identifier[i].isdigit():
-            number = number * 10 + int(identifier[i])
-            i += 1
+        # get duration
+        duration, identifier = pop_number(identifier)
+        if duration == 0:
+            duration = 4
+        elif not is_power_of_2(duration) and duration > 64:
+            return
 
-        # set number default pitch to a quarter note
-        if number == 0:
-            number = 4
+        # get pitch
+        pitch, identifier = pop_char(identifier)
+        if pitch not in "cdefgah":
+            return
 
-        if i == len(identifier) - 1:
-            return None
+        # check for flats/sharps
+        flat, sharp = False, False
+        if identifier[:2] in ("is", "es"):
+            flat = identifier[0] == "i"
+            sharp = identifier[0] == "e"
+            identifier = identifier[2:]
 
-    def __str__(self):
-        pass
+        octave, identifier = pop_number(identifier)
+        if octave == 0:
+            octave = 1
+
+        return Note(duration, (pitch, octave), flat=flat, sharp=sharp)
 
 
 @dataclass
-class Notes:
-    """A class for working with multiple notes."""
-
-    notes: Sequence[Note]
-
-
-@dataclass
-class Rest:
+class Rest(NoteLike):
     """A class for working with rests."""
 
-    duration: int
+    def __init__(self, duration, dotted=False):
+        super().__init__(
+            duration,
+            namedtuple(
+                "Rest",
+                [
+                    "WHOLE",
+                    "HALF",
+                    "QUARTER",
+                    "EIGHT",
+                    "SIXTEENTH",
+                    "THIRTY_SECOND",
+                    "SIXTY_FOURTH",
+                ],
+            )("𝄻", "𝄼", "𝄽", "𝄾", "𝄿", "𝅀", "𝅁"),
+            dotted=dotted,
+        )
 
     @classmethod
     def from_identifier(cls, identifier: str) -> Union[Rest, None]:
-        """Returns a Rest object initialized from an identifier."""
-        # check for rest symbol and 0-length rest
-        if len(identifier) == 0 or identifier[-1] != "r" or identifier[0] == "0":
-            return
+        """Returns a Note object initialized from an identifier in the following form:
 
-        # parse the number
-        duration, i = 0, 0
-        while identifier[i].isdigit():
-            duration = duration * 10 + int(identifier[i])
-            i += 1
+                               [<duration>]r[.]
 
-        # set duration default pitch to a quarter rest
+        - duration -- the duration of the note (1 is whole, 2 is half...)
+        """
+        # get duration
+        duration, identifier = pop_number(identifier)
         if duration == 0:
-            duration = 1
-
-        # restrict it to power of 2
-        if i != len(identifier) - 1 or not is_power_of_2(duration) or duration > 64:
+            duration = 4
+        elif not is_power_of_2(duration) and duration > 64:
             return
 
-        return Rest(duration)
+        # check for the r symbol
+        r, identifier = pop_char(identifier)
+        if r != "r":
+            return
 
-    def __str__(self):
-        return Notation.Rest[int(log(self.duration, 2))]
+        return Rest(duration, dotted=pop_char(identifier)[0] == ".")
 
 
 class Score:
@@ -146,11 +171,11 @@ class Score:
         self.clef = clef
         self.time = time
 
-        self.notes: List[Union[Note, Notes, Rest]] = []
+        self.notes: List[Union[Note, Rest]] = []
 
         self.position = 0
 
-    def __getitem__(self, i) -> Union[Note, Notes, Rest, None]:
+    def __getitem__(self, i) -> Union[Note, Rest, None]:
         """Returns the i-th item from the Score."""
         return self.notes[i]
 
@@ -192,10 +217,10 @@ class Score:
         for i in range(self.position, len(self.notes)):
             # if it's not a rest, replace it and return
             if type(self.notes[i]) is not Rest:
-                self.notes[i] = Rest(self.notes[i].duration)
+                self.notes[i] = Rest(self.notes[i].get_duration())
                 return
 
-            total += 1 / self.notes[i].duration
+            total += 1 / self.notes[i].get_duration()
 
             if total == 1:
                 # pop all of the rests that add up to 1
@@ -206,7 +231,6 @@ class Score:
 
     def insert(self, string) -> bool:
         """Add an item to the score, returning True if something was added."""
-        # try to parse as each of the types of things to put in a notesheet
         for c in [Note, Rest]:
             item = c.from_identifier(string)
 
@@ -216,17 +240,17 @@ class Score:
                     # TODO
                     return
 
-                remaining_duration = sum(1 / n.duration for n in self.notes) % 1
+                remaining_duration = sum(1 / n.get_duration() for n in self.notes) % 1
 
                 # if the rest/note fits in the current bar, simply add it
-                if remaining_duration + 1 / item.duration <= 1:
+                if remaining_duration + 1 / item.get_duration() <= 1:
                     self.notes.insert(self.position, item)
                     self.position += 1
 
                 else:
                     # duration before and after the bar
                     before_duration = 1 - remaining_duration
-                    after_duration = 1 / item.duration - (1 - remaining_duration)
+                    after_duration = 1 / item.get_duration() - (1 - remaining_duration)
 
                     # split into multiple items
                     before_items = self.split(item, before_duration)

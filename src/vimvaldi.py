@@ -429,7 +429,15 @@ class Editor(Controllable):
                 x += 2
                 continue
 
+            # draw rests/notes/whatever
             if type(item) is Rest:
+                self.window.addstr(
+                    center + len(heading) + lines // 2,
+                    self.side_offsets[0] + x,
+                    str(item),
+                    curses.A_UNDERLINE,
+                )
+            elif type(item) is Note:
                 self.window.addstr(
                     center + len(heading) + lines // 2,
                     self.side_offsets[0] + x,
