@@ -6,7 +6,7 @@ from copy import deepcopy
 from collections import namedtuple
 from math import log
 
-from utilities import *
+from vimvaldi.utilities import *
 
 # DEBUG
 import logging

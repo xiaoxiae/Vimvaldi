@@ -14,8 +14,8 @@ import curses
 import sys
 import re
 
-from utilities import *
-from music import *
+from vimvaldi.utilities import *
+from vimvaldi.music import *
 
 
 class Drawable(ABC):
@@ -847,5 +847,10 @@ class Interface:
         self.main_window.resize(height - 1, width)
 
 
-if __name__ == "__main__":
+def run():
+    """An entry point to the progam."""
     curses.wrapper(Interface)
+
+if __name__ == "__main__":
+    run()
+
