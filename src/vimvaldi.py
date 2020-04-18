@@ -1,21 +1,20 @@
 # cleaner code!
 from typing import *
 from dataclasses import dataclass
+
 from abc import ABC, abstractmethod
 from enum import Enum
 
-# DEBUG
+# DEBUG; TO BE REMOVED
 import logging
 
 logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
 
-# terminal interaction
 import curses
-
-# utility functions
-import util
 import sys
 import re
+
+from utilities import *
 from music import *
 
 
@@ -25,10 +24,12 @@ class Drawable(ABC):
     def __init__(self, window):
         self.window = window
 
+        # the position of the cursor on the window
         self.cursor_position = None
 
     def move_cursor(self):
-        """A function for setting the cursor position after redrawing the components."""
+        """A function for setting the cursor position. Called after the components are
+        drawn. """
         if self.cursor_position is not None:
             self.window.move(*self.cursor_position)
 
@@ -130,11 +131,11 @@ class Menu(Controllable):
     def draw(self):
         height, width = self.window.getmaxyx()
 
-        y_off = util.center_coordinate(height, len(self.title) + 1 + len(self.items))
+        y_off = center_coordinate(height, len(self.title) + 1 + len(self.items))
 
         # draw the title of the menu
         for i, line in enumerate(self.title):
-            x_off = util.center_coordinate(width, len(line))
+            x_off = center_coordinate(width, len(line))
             self.window.addstr(y_off + i, x_off, line)
 
         # draw the menu itself
@@ -148,7 +149,7 @@ class Menu(Controllable):
             else:
                 label = item.label
 
-            x_off = util.center_coordinate(width, len(label))
+            x_off = center_coordinate(width, len(label))
             self.window.addstr(y_off + len(self.title) + 2 + i, x_off, label)
 
         # display the tooltip of the current item
@@ -381,14 +382,14 @@ class Editor(Controllable):
             "|  _| / _` (_) __/ _ \| '_|\n"
             "| |__| (_| | | || (_) | |  \n"
             "|_____\__,_|_|\__\___/|_|  \n"
-            "                           "
+            "                           \n\n\n"
         ).split("\n")
 
-        center = util.center_coordinate(height, lines + len(heading))
+        center = center_coordinate(height, lines + len(heading))
 
         # draw the title of the menu
         for i, line in enumerate(heading):
-            x_off = util.center_coordinate(width, len(line))
+            x_off = center_coordinate(width, len(line))
             self.window.addstr(center + i, x_off, line)
 
         # draw the 5 lines of a note sheet
@@ -413,11 +414,13 @@ class Editor(Controllable):
                 curses.A_UNDERLINE,
             )
 
-        # draw the 5 lines of a note sheet
-        for y in range(center + 1, center + lines):
-            self.window.addstr(
-                y + len(heading), self.side_offsets[0] + 6, "|", curses.A_UNDERLINE
-            )
+        # draw the vertical bar after time
+        draw_vertical_bar(
+            self.window,
+            self.side_offsets[0] + 6,
+            center + 1 + len(heading),
+            center + lines + len(heading),
+        )
 
         # draw the notes/rests/whatever
         x = 8  # position from left offset
@@ -433,20 +436,21 @@ class Editor(Controllable):
                 break
 
             # if the duration accumulated to 1, draw a vertical bar
+            # and reset the duration
             if duration == 1:
                 duration = 0
-                for y in range(center + 1, center + lines):
-                    self.window.addstr(
-                        y + len(heading),
-                        self.side_offsets[0] + x,
-                        "|",
-                        curses.A_UNDERLINE,
-                    )
+
+                draw_vertical_bar(
+                    self.window,
+                    self.side_offsets[0] + x,
+                    center + 1 + len(heading),
+                    center + lines + len(heading),
+                )
 
                 x += 2
                 continue
 
-            # draw rests/notes/whatever
+            # draw rests
             if type(item) is Rest:
                 self.window.addstr(
                     center + len(heading) + lines // 2,
@@ -454,20 +458,46 @@ class Editor(Controllable):
                     str(item),
                     curses.A_UNDERLINE,
                 )
+
+            # draw notes
             elif type(item) is Note:
+                # the position of C4
+                offset = ord(item.pitch[0]) - 99 + (item.pitch[1] - 4) * 8
+
+                l = offset // 2
+                m = offset % 2
+
+                note = str(item)
+                if m == 1:
+                    note += "*"
+
                 self.window.addstr(
-                    center + len(heading) + lines // 2,
+                    center + len(heading) + lines // 2 - l,
                     self.side_offsets[0] + x,
-                    str(item),
+                    note,
                     curses.A_UNDERLINE,
                 )
 
             # possibly move the cursor accordingly
             if i == self.score.position:
+                x_offset = 0 if type(item) is not None else m
+                y_offset = 0 if type(item) is not None else l
+
                 cursor_position = (
-                    center + len(heading) + lines // 2,
-                    self.side_offsets[0] + x,
+                    center + len(heading) + lines // 2 - y_offset,
+                    self.side_offsets[0] + x + x_offset,
                 )
+
+            ## check for a dot
+            # if item.dotted:
+            #    x += 1
+
+            #    self.window.addstr(
+            #        center + len(heading) + lines // 2,
+            #        self.side_offsets[0] + x,
+            #        ".",  # TODO: replace with a better dot
+            #        curses.A_UNDERLINE,
+            #    )
 
             # the duration of notes is 1 = whole, 2 = half...
             duration += 1 / item.duration
@@ -600,7 +630,7 @@ class StatusLine(Drawable):
         _, width = self.window.getmaxyx()
 
         left_offset = 0
-        center_offset = util.center_coordinate(width, len(self.text[1]))
+        center_offset = center_coordinate(width, len(self.text[1]))
         right_offset = width - len(self.text[2]) - 1
 
         # if the status line is focused, only draw the left line (i.e. the command)
@@ -789,9 +819,7 @@ class Interface:
 
                 self.window.clear()
                 self.window.addstr(
-                    height // 2,
-                    util.center_coordinate(width, len(error_text)),
-                    error_text,
+                    height // 2, center_coordinate(width, len(error_text)), error_text,
                 )
 
             k = self.window.get_wch()

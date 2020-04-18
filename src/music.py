@@ -1,11 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import *
-from copy import deepcopy
 
+from copy import deepcopy
 from collections import namedtuple
-from util import *
 from math import log
+
+from utilities import *
 
 # DEBUG
 import logging
@@ -115,6 +116,8 @@ class Note(NoteLike):
         octave, identifier = pop_number(identifier)
         if octave == 0:
             octave = 1
+
+        # TODO return if identifier is not empty
 
         return Note(duration, (pitch, octave), flat=flat, sharp=sharp)
 
