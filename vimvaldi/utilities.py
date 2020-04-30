@@ -10,16 +10,6 @@ def center_coordinate(a: int, b: int) -> int:
     return (a // 2) - (b // 2) - b % 2
 
 
-def is_power_of_2(number: int):
-    """Return True if the input _positive_ number is a power of 2."""
-    while number != 1:
-        if number % 2 != 0:
-            return False
-        number //= 2
-
-    return True
-
-
 def pop_number(string: str) -> Tuple[int, str]:
     """Pops a number from the beginning of the string."""
     number = 0

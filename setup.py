@@ -27,5 +27,6 @@ setup(
     entry_points={'console_scripts': ['vimvaldi=vimvaldi.__init__:run']},
 
     # requirements
+    install_requires=["abjad"],
     python_requires='>=3.8',
 )

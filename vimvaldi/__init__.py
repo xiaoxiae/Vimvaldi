@@ -1,14 +1,9 @@
-# cleaner code!
+"""The initial class that gets called when the program is launched."""
+
 from typing import *
 from dataclasses import dataclass
 
 from abc import ABC, abstractmethod
-from enum import Enum
-
-# DEBUG; TO BE REMOVED
-import logging
-
-logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
 
 import curses
 import sys
@@ -18,124 +13,69 @@ from vimvaldi.utilities import *
 from vimvaldi.music import *
 
 
-class Drawable(ABC):
+class Drawable(ABC, Changeable):
     """A class to be extended by things that write on the courses windows."""
+
+    focused = False  # whether this drawable is currently focused
 
     def __init__(self, window):
         self.window = window
 
-        # the position of the cursor on the window
-        self.cursor_position = None
+    def focus(self):
+        """Set the focus on this Drawable."""
+        self.focused = True
 
-    def move_cursor(self):
+    def is_focused(self):
+        """Return True if this Drawable is currently focused."""
+        return self.focused
+
+    def move_cursor(self, position: Tuple[int, int]):
         """A function for setting the cursor position. Called after the components are
-        drawn. """
-        if self.cursor_position is not None:
-            self.window.move(*self.cursor_position)
+        drawn, since drawing them moves the cursor. Only does something if the drawable
+        is focused."""
+        if self.focused:
+            if self.cursor_position is not None:
+                curses.curs_set(1)
+                self.window.move(*self.cursor_position)
+            else:
+                curses.curs_set(0)
 
-    def refresh(self):
-        """Is called to possibly redraw of this Drawable (if anything changed). Note
-        that the window.refresh() is not called here, since the cursor position will
-        change."""
-        self.window.clear()
-        self.draw()
+    def width(self):
+        """Return the width of the window."""
+        return self.window.getmaxyx()[1]
+
+    def height(self):
+        """Return the height of the window."""
+        return self.window.getmaxyx()[0]
 
     @abstractmethod
-    def draw():
-        """Does the actual drawing; is called inside self.refresh()."""
+    def __draw(self):
+        """The internal implementation that draws on the actual window and has to be
+        implemented by classes that inherit this class."""
         pass
-
-    @abstractmethod
-    def handle_keypress(self, key: int) -> Union[None, List[str]]:
-        """Handles a single keypress. Possibly returns the command (list of params)."""
-        pass
-
-
-class Controllable(Drawable, ABC):
-    """A class extending Drawable that uses StatusLine to execute commands. It is
-    essentially the stuff you see on the main screen."""
-
-    def __init__(self, window, status_line):
-        super().__init__(window)
-
-        self.status_line = status_line
-
-
-@dataclass
-class MenuItem:
-    """A class for representing an item of a menu."""
-
-    label: str
-    action: List[str]
-    tooltip: str
-
-
-class Menu(Controllable):
-    """A class for representing and working with a menu."""
-
-    def __init__(self, window, status_line, items: Sequence[Union[None, MenuItem]]):
-        super().__init__(window, status_line)
-
-        self.index = 0
-        self.items = items
-
-        self.title = (
-            " __  __                  \n"
-            "|  \/  | ___ _ __  _   _ \n"
-            "| |\/| |/ _ \ '_ \| | | |\n"
-            "| |  | |  __/ | | | |_| |\n"
-            "|_|  |_|\___|_| |_|\__,_|"
-        ).split("\n")
-
-    def __move_index(self, delta):
-        """Moves the index of the menu by delta positions (ignoring spacers)."""
-        self.index = (self.index + delta) % len(self.items)
-
-        # skip the spacers
-        while self.items[self.index] is None:
-            self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
-
-        self.window.noutrefresh()
-
-    def next(self):
-        """Point to the next item in the menu."""
-        self.__move_index(1)
-
-    def previous(self):
-        """Point to the previous item in the menu."""
-        self.__move_index(-1)
-
-    def get_tooltip(self) -> str:
-        """Return the tooltip associated with the currently selected menu item."""
-        return self.items[self.index].tooltip
-
-    def is_selected(self, item: MenuItem) -> bool:
-        """Returns True if the specified item matches the currently selected one."""
-        return self.items[self.index] is item
-
-    def handle_keypress(self, key: int) -> Union[None, List[str]]:
-        command = self.status_line.handle_keypress(key)
-
-        if self.status_line.is_focused() or command != None:
-            return command
-
-        if key == "j":
-            self.next()
-
-        elif key == "k":
-            self.previous()
-
-        elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
-            return self.items[self.index].action
 
     def draw(self):
-        height, width = self.window.getmaxyx()
+        """The function that draws the Drawable (if anything changed). Checks, whether
+        the drawable has changed; if it does, clears the window and calls __draw()."""
+        if self.has_changed():
+            self.window.clear()
+            self.__draw()
 
-        y_off = center_coordinate(height, len(self.title) + 1 + len(self.items))
 
-        # draw the title of the menu
+class DrawableMenu(Drawable, Menu):
+    def __init__(self, window, title: str, items: Sequence[Optional[MenuItem]]):
+        Drawable.__init__(self, window)
+        Menu.__init__(self, items)
+
+        self.title = title
+
+    def __draw(self):
+        # the y offset from the top of the window to where to start drawing
+        y_off = center_coordinate(self.height(), len(self.title) + 1 + len(self.items))
+
+        # draw the title of the menu, line by line
         for i, line in enumerate(self.title):
-            x_off = center_coordinate(width, len(line))
+            x_off = center_coordinate(self.width(), len(line))
             self.window.addstr(y_off + i, x_off, line)
 
         # draw the menu itself
@@ -144,71 +84,56 @@ class Menu(Controllable):
             if item is None:
                 continue
 
-            if self.is_selected(item):
-                label = f"> {item.label} <"
+            # mark the selected label
+            if self.get_selected() is item:
+                text = f"> {item.label} <"
             else:
-                label = item.label
+                text = item.label
 
-            x_off = center_coordinate(width, len(label))
-            self.window.addstr(y_off + len(self.title) + 2 + i, x_off, label)
-
-        # display the tooltip of the current item
-        if not self.status_line.is_focused():
-            self.status_line.set_text(self.status_line.CENTER, self.get_tooltip())
+            x_off = center_coordinate(self.width(), len(text))
+            self.window.addstr(y_off + len(self.title) + 2 + i, x_off, text)
 
 
-class LogoDisplay(Controllable):
-    """A very simple class for displaying the logo."""
+class DrawableLogoDisplay(Drawable, LogoDisplay):
+    def __init__(self, window, text: str):
+        Drawable.__init__(self, window)
+        LogoDisplay.__init__(self, text)
 
-    def __init__(self, window, status_line, text: Sequence[str]):
-        super(LogoDisplay, self).__init__(window, status_line)
-
-        self.text = text
-
-    def draw(self):
-        """Draws the centered program logo on the main window."""
-        self.window.clear()
-
-        height, width = self.window.getmaxyx()
-
-        for y, line in enumerate(self.text):
+    def __draw(self):
+        """Draws the centered program logo on the window."""
+        for y, line in enumerate(self.text.splitlines()):
             for x, char in enumerate(line):
                 self.window.addstr(
-                    y + (height - len(self.text)) // 2,
-                    x + (width - len(line)) // 2,
+                    y + (self.height() - len(self.text)) // 2,
+                    x + (self.width() - len(line)) // 2,
                     char,
                     curses.color_pair(16 if char != "*" else 35),
                 )
 
-        self.status_line.clear()
 
-    def handle_keypress(self, key: int) -> Union[None, List[str]]:
-        if key in (curses.KEY_ENTER, "\n", "\r"):
-            return ["change_state", "menu"]
-
-
-class TextDisplay(Controllable):
-    """A class for working with a (scrollable) text display."""
-
-    def __init__(self, window, status_line, text: Sequence[str]):
-        super(TextDisplay, self).__init__(window, status_line)
+class DrawableTextDisplay(Controllable):
+    def __init__(self, window, text: str):
+        Drawable.__init__(self, window)
+        TextDisplay.__init__(self, text)
 
         self.text = text
 
-        self.line_offset = 0
-        self.side_offsets = [3, 1]  # left/right offset, top/bottom offset
+        self.side_offsets = [3, 1]  # left/right offset, top/bottom offset when drawing
 
     def __get_content_space(self) -> Tuple[int, int]:
-        """Get the width and the height of the area that we can print on."""
-        height, width = self.window.getmaxyx()
-        return width - 2 * self.side_offsets[0], height - 2 * self.side_offsets[1]
+        """Get the width and the height of the area that we can put text on."""
+        return (
+            self.width() - 2 * self.side_offsets[0],
+            self.height() - 2 * self.side_offsets[1],
+        )
 
-    def draw(self):
+    def __draw(self):
+        # get the free space that we can draw on
         width, height = self.__get_content_space()
 
         # wrap the lines first (adding them to a list)
         wrapped: List[Tuple[str, indent_level]] = []
-        for line in self.text:
+        for line in self.text.splitlines():
             if line == "":
                 wrapped.append(("", 0))
 
@@ -306,6 +231,7 @@ class TextDisplay(Controllable):
         if key == "q":
             return ["quit"]
 
+        # TODO drawable text display
         height = self.__get_content_space()[1]
 
         if key == chr(4):  # ^D
@@ -649,12 +575,12 @@ class Interface:
         # window setup
         self.window = window
 
+        # derive two windows from the current one -- the main one and the status one
         height, width = self.window.getmaxyx()
         self.main_window = self.window.derwin(height - 1, width, 0, 0)
         self.status_window = self.window.derwin(1, width, height - 1, 0)
 
-        curses.curs_set(0)  # disable cursor in the logo screen
-
+        # initialize the terminal colors
         self.initialize_colors()
 
         # COMPONENT INITIALIZATION
@@ -679,7 +605,7 @@ class Interface:
                     "     |     | | '_ V _ \ \ / / _` | |/ _` | |\n"
                     "     |    /| | | | | | \ V / (_| | | (_| | |\n"
                     "     |__/' |_|_| |_| |_|\_/ \__._|_|\__,_|_|"
-                ).split("\n"),
+                ),
             ),
             "info": TextDisplay(
                 self.main_window,
@@ -736,54 +662,16 @@ class Interface:
         # being displayed; we start with the logo
         self.state_stack: List[Component] = [self.components["logo"]]
 
-        # run the program
-        self.run()
+        # run the program (permanent loop)
+        self.loop()
 
-    def run(self):
+    def loop(self):
         """The main loop of the program."""
         k = None
         while True:
-            # handle window resize event
+            # special window resize event handling
             if k == curses.KEY_RESIZE:
                 self.resize_windows()
-            else:
-                command = self.state_stack[-1].handle_keypress(k)
-
-            # handle commands sent by the components
-            if command != None:
-                # commands of length one
-                if len(command) == 1:
-                    if command[0] == "quit":
-                        self.state_stack.pop()
-
-                        # when there's nothing to control, exit...
-                        if len(self.state_stack) == 0:
-                            sys.exit()
-
-                    elif command[0] in ("help", "info", "new"):
-                        # remove all text displays, if a new one should open up
-                        while (
-                            len(self.state_stack) != 0
-                            and type(self.state_stack[-1]) is TextDisplay
-                        ):
-                            self.state_stack.pop()
-
-                        if command[0] == "new":
-                            self.state_stack.append(self.components["editor"])
-                            self.status_line.clear()
-                        else:
-                            self.state_stack.append(self.components[command[0]])
-
-                elif len(command) == 2:
-                    # changing the state of the app
-                    if command[0] == "change_state":
-                        self.state_stack[-1] = self.components[command[1]]
-                        self.status_line.clear()
-
-                    # adding another state of the app
-                    elif command[0] == "append_state":
-                        self.state_stack.append(self.components[command[1]])
-                        self.status_line.clear()
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying an error message
@@ -799,35 +687,22 @@ class Interface:
                 self.state_stack[-1].window.refresh()
                 self.status_line.window.refresh()
 
-                if main_cp is not None or status_cp is not None:
-                    curses.curs_set(1)
-
-                    if status_cp is not None:
-                        self.status_line.move_cursor()
-                        self.status_line.window.refresh()
-
-                    elif main_cp is not None:
-                        self.state_stack[-1].move_cursor()
-                        self.state_stack[-1].window.refresh()
-                else:
-                    curses.curs_set(0)
-
             except curses.error:
+                # TODO better error handling
                 height, width = self.window.getmaxyx()
 
-                error_text = "Screen size too small!"[: width - 1]
+                error_text = "Terminal size too small!"[: width - 1]
 
                 self.window.clear()
                 self.window.addstr(
                     height // 2, center_coordinate(width, len(error_text)), error_text,
                 )
 
+            # wait for the next character
             k = self.window.get_wch()
 
     def initialize_colors(self):
-        """Initializes the colors used throughout the program 
-        (see https://jonasjacek.github.io/colors/)."""
-
+        """Initializes the colors used throughout the program."""
         curses.start_color()
         curses.use_default_colors()
 
@@ -838,9 +713,7 @@ class Interface:
         """Resize the windows of the interface."""
         height, width = self.window.getmaxyx()
 
-        # Please, don't ask me why this is necessary. There seems to be an issue with
-        # simply moving the status window using mvin, but this seems to fix it (remove
-        # one of the lines and try for yourself by resizing the terminal).
+        # TODO is this necessary?
         self.status_window.mvderwin(height - 1, 0)
         self.status_window.mvwin(height - 1, 0)
 
@@ -851,6 +724,6 @@ def run():
     """An entry point to the progam."""
     curses.wrapper(Interface)
 
+
 if __name__ == "__main__":
     run()
-
