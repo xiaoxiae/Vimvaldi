@@ -2,10 +2,11 @@
 *.xopp
 *.xopp~
 
-# Python cache (and log) files
+# Python cache (and log) files (and scripts)
 .mypy_cache
 __pycache__
 *.log
+watch
 
 # Private files
 resources/
