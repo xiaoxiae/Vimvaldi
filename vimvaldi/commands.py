@@ -1,15 +1,54 @@
 """A module for working with command."""
+from dataclasses import dataclass
 
-from enum import Enum, auto
 
-
+@dataclass
 class Command:
-    """A class that is inherited by all of the commands."""
+    """The default command class that is inherited by all other command classes."""
 
-    # pop components
-    # display text on the status line
-    # change to components
 
-    # status line insert mode
-    # transfer_focus
-    pass
+
+class GeneralCommand(Command):
+    """Other commands that didn't really fit anywhere else."""
+
+class QuitCommand(GeneralCommand):
+    """A command to quit."""
+
+class ToggleFocusCommand(GeneralCommand):
+    """A command to toggle focus from the status line to the main window."""
+
+
+
+class ComponentCommand(Command):
+    """A class for component commands."""
+
+class PopComponentCommand(ComponentCommand):
+    """Pop a component from the component stack."""
+
+@dataclass
+class PushComponentCommand(ComponentCommand):
+    """Push a component onto the component stack."""
+    component: str
+
+
+
+class StatusLineCommand(Command):
+    """A class for status line commands."""
+
+@dataclass
+class SetStatusLineText(StatusLineCommand):
+    """Set the status line to the given text."""
+    text: str
+    position: int
+
+@dataclass
+class SetStatusLineMode(StatusLineCommand):
+    """Set the status line mode."""
+    mode: int
+
+
+
+@dataclass
+class InsertCommand(Command):
+    """The command that gets passed to the editor to deal with."""
+    text: str

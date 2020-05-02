@@ -1,15 +1,21 @@
+"""The module containing all of the components logic."""
+
+from __future__ import annotations
+
 from typing import *
 from dataclasses import dataclass
 
+from abc import ABC, abstractmethod
 from enum import Enum, auto
 
+import curses
 from vimvaldi.commands import *
 
 
 class Changeable:
     """A class representing something for which it makes sense to be marked changed."""
 
-    changed = False  # set to True if something
+    changed = True
 
     def has_changed(self) -> bool:
         """Return True if the changeable has changed."""
@@ -20,16 +26,16 @@ class Changeable:
         self.changed = value
 
 
-class Component(Changeable):
+class Component(ABC, Changeable):
     """A class that is inherited by all of the components."""
 
     @abstractmethod
-    def handle_keypress(self, key: int) -> Optional[Command]:
+    def handle_keypress(self, key: int) -> List[Command]:
         """Handles a single keypress. Returns the resulting command."""
         pass
 
     @abstractmethod
-    def handle_command(self, Command) -> Optional[Command]:
+    def handle_command(self, Command) -> List[Command]:
         """Handles the given command. Returns the resulting command."""
         pass
 
@@ -78,10 +84,10 @@ class Menu:
         """Return the currently selected MenuItem object."""
         return self.items[self.index]
 
-    def handle_command(self, Command) -> Optional[Command]:
-        pass
+    def handle_command(self, Command) -> List[Command]:
+        return []  # TODO
 
-    def handle_keypress(self, key: int) -> Optional[Command]:
+    def handle_keypress(self, key: int) -> List[Command]:
         if key == "j":
             self.next()
 
@@ -89,19 +95,27 @@ class Menu:
             self.previous()
 
         elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
-            return self.items[self.index].action
+            return [self.get_selected().action]
+
+        return []
 
 
 class LogoDisplay(Component):
     """A very simple for displaying the logo."""
 
-    def __init__(self, window, text: str):
+    def __init__(self, text: str):
         self.text = text
 
-    def handle_keypress(self, key: int) -> Optional[Command]:
+    def handle_keypress(self, key: int) -> List[Command]:
         """Go away from the logo when enter is pressed."""
         if key in (curses.KEY_ENTER, "\n", "\r"):
-            return None  # TODO pop logo
+            return [PopComponentCommand()]
+
+        return []
+
+    def handle_command(self, Command) -> List[Command]:
+        """Don't handle any commands."""
+        return []
 
 
 class TextDisplay(Component):
@@ -113,7 +127,10 @@ class TextDisplay(Component):
         # the current offset of the text display (by lines)
         self.line_offset = 0
 
-    def handle_keypress(self, key: int) -> Optional[Command]:
+    def handle_command(self, Command) -> List[Command]:
+        return []  # TODO
+
+    def handle_keypress(self, key: int) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
             self.set_changed(True)
@@ -123,39 +140,44 @@ class TextDisplay(Component):
             self.set_changed(True)
 
         elif key == "q":
-            return None  # TODO quit
+            return [PopComponentCommand()]
+
+        return []
 
 
 class StatusLine(Component):
     """A class for inputting/displaying information for the app."""
 
-    class Position(Enum):
-        LEFT = auto()
-        CENTER = auto()
-        RIGHT = auto()
+    class position(Enum):
+        LEFT = 0
+        CENTER = 1
+        RIGHT = 2
 
-    class State(Enum):
+    class state(Enum):
         NORMAL = auto()
         INSERT = auto()
 
     # the current state of the status line
-    current_state = State.NORMAL
+    current_state = state.NORMAL
 
-    def __init__(self, window):
+    def __init__(self):
         self.text = ["", "", ""]  # left, center, right text
 
         # current position of the cursor on the status line
         self.cursor_offset = 0
 
-    def set_text(self, position: int, text: str):
+    def set_text(self, position: StatusLine.position, text: str):
         """Change text at the specified position (left/center/right)."""
-        self.text[position] = text
+        self.text[position.value] = text
 
     def clear(self):
         """Clear all text from the StatusLine."""
         self.text = ["", "", ""]
 
-    def handle_keypress(self, key: int) -> Optional[Command]:
+    def handle_command(self, Command) -> List[Command]:
+        return []  # TODO
+
+    def handle_keypress(self, key: int) -> List[Command]:
         # to simplify the code
         pos = self.cursor_offset
 
@@ -169,7 +191,7 @@ class StatusLine(Component):
                 # if there is no text left, transfer focus
                 if len(self.text[0]) == 0:
                     self.text[0] = ""
-                    # TODO transfer focus
+                    return [ToggleFocusCommand()]
 
         # delete: delete next character
         elif key == curses.KEY_DC:
@@ -178,7 +200,7 @@ class StatusLine(Component):
         # escape: clear and transfer focus
         elif type(key) is str and ord(key) == 27:  # esc
             self.clear()
-            # TODO transfer focus
+            return [ToggleFocusCommand()]
 
         # left: move cursor to the left
         elif key == curses.KEY_LEFT:  # move cursor left
@@ -208,25 +230,21 @@ class StatusLine(Component):
 
         # execute the command on enter
         elif key in (curses.KEY_ENTER, "\n", "\r"):
-            # TODO transfer focus
-            # TODO parse commands
+            # always toggle focus
+            commands = [ToggleFocusCommand()]
 
+            # get and clear the text
             text = self.text[0]
-
-            self.set_focused(False)
             self.text[0] = ""
 
-            # insert parsing
-            if text[0] == ">":
-                return ["insert", text[1:]]
+            # send an insert command if the mode is insert
+            if self.current_state is StatusLine.state.INSERT:
+                commands.append(InsertCommand(text))
+            elif self.current_state is StatusLine.state.NORMAL:
+                if text in ("q", "quit"):
+                    commands.append(QuitCommand())
 
-            command = text[1:].split()
-
-            # parsing of specific commands
-            if command == ["q"]:
-                return ["quit"]
-
-            return command
+            return commands
 
         # else add the character to the first position
         self.text[0] = self.text[0][:pos] + str(key) + self.text[0][pos:]
