@@ -62,6 +62,10 @@ class WindowView:
         # TODO check bounds
         self.parent.addstr(y + self.view.y, x + self.view.x, string, *args, **kwargs)
 
+    def move(self, x: int, y: int):
+        self.parent.move(y + self.view.y, x + self.view.x)
+        
+
 
 class Drawable(ABC, Changeable):
     """A class to be extended by things that write on the curses windows."""
@@ -71,6 +75,10 @@ class Drawable(ABC, Changeable):
 
     def __init__(self, window: WindowView):
         self.window = window
+
+    def toggle_focused(self):
+        """Toggle the focus on this Drawable."""
+        self.focused = not self.focused
 
     def set_focused(self, value: bool):
         """Set the focus on this Drawable."""
@@ -288,18 +296,26 @@ class DrawableStatusLine(Drawable, StatusLine):
 
     def _draw(self):
         # the offsets of each of the text positions
-        l_off = 0
-        c_off = center_coordinate(self.window.width(), len(self.text[1]))
-        r_off = self.window.width() - len(self.text[2]) - 1
+        offsets = [
+            0,
+            center_coordinate(self.window.width(), len(self.text[1])),
+            self.window.width() - len(self.text[2]) - 1,
+        ]
 
-        # if the status line is focused, only draw the left line (i.e. the command)
-        self.window.addstr(l_off, 0, self.text[0])
-        self.cursor_position = (0, self.cursor_offset)
+        if self.is_focused():
+            command_text = self.text[0]
+            cursor_offset = self.cursor_offset
 
-        # if it isn't also draw the rest
-        if not self.is_focused():
-            self.window.addstr(c_off, 0, self.text[1])
-            self.window.addstr(r_off, 0, self.text[2])
+            if self.current_state is StatusLine.state.NORMAL:
+                command_text = ":" + command_text
+            elif self.current_state is StatusLine.state.INSERT:
+                command_text = ">" + command_text
+
+            self.window.addstr(0, 0, command_text)
+            self.cursor_position = (self.cursor_offset + 1, 0)
+        else:
+            for i, offset in enumerate(offsets):
+                self.window.addstr(offset, 0, self.text[i])
 
 
 class Interface:
@@ -380,7 +396,6 @@ class Interface:
         self.component_stack = [self.components["menu"], self.components["logo"]]
         self.component_stack[-1].set_focused(True)
 
-
         # run the program (permanent loop)
         self.loop()
 
@@ -399,7 +414,6 @@ class Interface:
             else:
                 # send the key to the currently focused component
                 commands = self.get_focused().handle_keypress(k)
-                print(commands)
 
                 for command in commands:
                     # component commands
@@ -410,8 +424,16 @@ class Interface:
                         if len(self.component_stack) == 0:
                             return
 
+                        self.component_stack[-1].set_focused(True)
+
                     elif isinstance(command, PushComponentCommand):
                         self.component_stack.append(self.components[command.component])
+                        self.status_line.set_focused(False)
+                        self.component_stack[-1].set_focused(True)
+
+                    elif isinstance(command, ToggleFocusCommand):
+                        self.status_line.toggle_focused()
+                        self.component_stack[-1].toggle_focused()
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying an error message

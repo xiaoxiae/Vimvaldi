@@ -11,6 +11,12 @@ from enum import Enum, auto
 import curses
 from vimvaldi.commands import *
 
+# DEBUG; TO BE REMOVED
+import logging
+
+logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
+print = logging.info
+
 
 class Changeable:
     """A class representing something for which it makes sense to be marked changed."""
@@ -97,6 +103,9 @@ class Menu:
         elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
             return [self.get_selected().action]
 
+        elif key == (":"):
+            return [ToggleFocusCommand()]
+
         return []
 
 
@@ -181,16 +190,20 @@ class StatusLine(Component):
         # to simplify the code
         pos = self.cursor_offset
 
+        print(key == chr(127))
+
         # backspace: delete previous character
-        if key in (curses.KEY_BACKSPACE, "\x7f"):
+        if key in (curses.KEY_BACKSPACE, "\b", chr(127)):
             # delete when it's not in the first position
             if pos > 0:
                 self.text[0] = self.text[0][: pos - 1] + self.text[0][pos:]
                 self.cursor_offset -= 1
+
+            # if there is no text left, transfer focus
             else:
-                # if there is no text left, transfer focus
                 if len(self.text[0]) == 0:
                     self.text[0] = ""
+                    self.cursor_offset = 0
                     return [ToggleFocusCommand()]
 
         # delete: delete next character
@@ -236,6 +249,7 @@ class StatusLine(Component):
             # get and clear the text
             text = self.text[0]
             self.text[0] = ""
+            self.cursor_offset = 0
 
             # send an insert command if the mode is insert
             if self.current_state is StatusLine.state.INSERT:
@@ -243,9 +257,14 @@ class StatusLine(Component):
             elif self.current_state is StatusLine.state.NORMAL:
                 if text in ("q", "quit"):
                     commands.append(QuitCommand())
+                elif text in ("help", "info"):
+                    commands.append(PushComponentCommand(text))
 
             return commands
 
-        # else add the character to the first position
-        self.text[0] = self.text[0][:pos] + str(key) + self.text[0][pos:]
-        self.cursor_offset += len(str(key))
+        else:
+            # else add the character to the first position
+            self.text[0] = self.text[0][:pos] + str(key) + self.text[0][pos:]
+            self.cursor_offset += len(str(key))
+
+        return []
