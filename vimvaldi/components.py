@@ -70,8 +70,6 @@ class Menu(Component):
         while self.items[self.index] is None:
             self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
 
-        # TODO add action to change the status line to the currently selected label
-
         self.set_changed(True)
 
     def next(self):
@@ -93,11 +91,14 @@ class Menu(Component):
     def status_line_label_change(self) -> List[Command]:
         """Return the command necessary for the status line to change label."""
         return [
-            SetStatusLineTextCommand(self.get_selected().tooltip, StatusLine.position.CENTER)
+            SetStatusLineTextCommand(
+                self.get_selected().tooltip, StatusLine.position.CENTER
+            )
         ]
 
     def handle_command(self, Command) -> List[Command]:
-        return []  # TODO
+        """Don't handle any commands."""
+        return []
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
@@ -112,7 +113,10 @@ class Menu(Component):
             return [self.get_selected().action]
 
         elif key == (":"):
-            return [ToggleFocusCommand()]
+            return [
+                ToggleFocusCommand(),
+                SetStatusLineStateCommand(StatusLine.state.NORMAL),
+            ]
 
         return []
 
@@ -145,7 +149,8 @@ class TextDisplay(Component):
         self.line_offset = 0
 
     def handle_command(self, Command) -> List[Command]:
-        return []  # TODO
+        """Don't handle any commands."""
+        return []
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
@@ -206,6 +211,8 @@ class StatusLine(Component):
             self.set_text(command.position, command.text)
         elif isinstance(command, ClearStatusLineCommand):
             self.clear()
+        elif isinstance(command, SetStatusLineStateCommand):
+            self.current_state = command.state
 
         return []
 
@@ -289,3 +296,28 @@ class StatusLine(Component):
             self.cursor_offset += len(str(key))
 
         return []
+
+
+class Editor(Component):
+    """A class for working with the notesheet."""
+
+    def __init__(self):
+        # TODO abjad initialization (and everything else)
+        self.score = None
+
+    def handle_keypress(self, key: str) -> List[Command]:
+        if key == ":":
+            return [
+                ToggleFocusCommand(),
+                SetStatusLineStateCommand(StatusLine.state.NORMAL),
+            ]
+        elif key == "i":
+            return [
+                ToggleFocusCommand(),
+                SetStatusLineStateCommand(StatusLine.state.INSERT),
+            ]
+
+        return []
+
+    def handle_command(self, Command) -> List[Command]:
+        return []  # TODO

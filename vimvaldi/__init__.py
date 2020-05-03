@@ -64,7 +64,6 @@ class WindowView:
 
     def move(self, x: int, y: int):
         self.parent.move(y + self.view.y, x + self.view.x)
-        
 
 
 class Drawable(ABC, Changeable):
@@ -149,7 +148,6 @@ class DrawableMenu(Drawable, Menu):
 
             x_off = center_coordinate(self.window.width(), len(text))
             self.window.addstr(x_off, y_off + len(lines) + 2 + i, text)
-
 
     def set_focused(self, value: bool) -> List[Command]:
         Drawable.set_focused(self, value)
@@ -280,7 +278,6 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         Drawable.set_focused(self, value)
         return [ClearStatusLineCommand()]
 
-
     def handle_keypress(self, key: str) -> Command:
         """Expanded because TextDisplay couldn't easily implement ^D and ^U, since it
         doesn't know the current zoom level."""
@@ -335,6 +332,40 @@ class DrawableStatusLine(Drawable, StatusLine):
                 self.window.addstr(offset, 0, self.text[i])
 
 
+class DrawableEditor(Drawable, Editor):
+    def __init__(self, window, title: str):
+        Drawable.__init__(self, window)
+        Editor.__init__(self)
+
+        self.title = title
+
+        self.side_offsets = [5, 1]  # left/right offset, top/bottom offset
+
+    def _draw(self):
+        sheet_lines = 5  # number of lines in a note sheet
+
+        width = self.window.width()
+        height = self.window.height()
+
+        title_sheet_spacing = 3
+
+        # center the logo and the sheet horizontally
+        center = center_coordinate(
+            height, sheet_lines + len(self.title.splitlines()) + title_sheet_spacing
+        )
+
+        # draw the title of the menu
+        for i, line in enumerate(self.title.splitlines()):
+            x_off = center_coordinate(width, len(line))
+            self.window.addstr(x_off, center + i + title_sheet_spacing, line)
+
+        # draw the sheet lines
+        for x in range(self.side_offsets[0], width - self.side_offsets[0]):
+            for y in range(sheet_lines):
+                y += center + len(self.title.splitlines()) + title_sheet_spacing
+                self.window.addstr(x, y, " ", curses.A_UNDERLINE)
+
+
 class Interface:
     """A high-level class for rendering the user interface."""
 
@@ -378,11 +409,21 @@ class Interface:
                 "| |  | |  __/ | | | |_| |\n"
                 "|_|  |_|\___|_| |_|\__,_|",
                 [
-                    MenuItem("CREATE", None, "Creates a new score."),
+                    MenuItem(
+                        "CREATE", PushComponentCommand("editor"), "Creates a new score."
+                    ),
                     MenuItem("IMPORT", None, "Imports a score from a file."),
                     None,
-                    MenuItem("HELP", PushComponentCommand("help"), "Displays program documentation."),
-                    MenuItem("INFO", PushComponentCommand("info"), "Shows information about the program."),
+                    MenuItem(
+                        "HELP",
+                        PushComponentCommand("help"),
+                        "Displays program documentation.",
+                    ),
+                    MenuItem(
+                        "INFO",
+                        PushComponentCommand("info"),
+                        "Shows information about the program.",
+                    ),
                     None,
                     MenuItem("QUIT", PopComponentCommand(), "Terminates the program."),
                 ],
@@ -390,11 +431,13 @@ class Interface:
             "info": DrawableTextDisplay(
                 self.main_window,
                 r"# Info" + "\n"
-                r"The following page contains relevant information about the app." + "\n\n"
+                r"The following page contains relevant information about the app."
+                + "\n\n"
                 r"## History" + "\n"
-                r"This project was created as a semester project for the AP Programming Course at the Charles University (/http:\/\/mj.ucw.cz\/vyuka\/1920\/p1x\//)." + "\n\n"
+                r"This project was created as a semester project for the AP Programming Course at the Charles University (/http:\/\/mj.ucw.cz\/vyuka\/1920\/p1x\//)."
+                + "\n\n"
                 r"## Source Code" + "\n"
-                r"The code is licensed under MIT and freely available from /https:\/\/github.com\/xiaoxiae\/Vimvaldi\//, so feel free do whatever you want with it :-). Also feel free to submit a pull request if there's something you'd like to see changed or implemented!"
+                r"The code is licensed under MIT and freely available from /https:\/\/github.com\/xiaoxiae\/Vimvaldi\//, so feel free do whatever you want with it :-). Also feel free to submit a pull request if there's something you'd like to see changed or implemented!",
             ),
             "help": DrawableTextDisplay(
                 self.main_window,
@@ -403,7 +446,16 @@ class Interface:
                 r"## General commands (can be run from anywhere within the app)" + "\n"
                 r"_:help_       -- displays this page" + "\n"
                 r"_:info_       -- displays the info page" + "\n"
-                r"_:q_ or _:quit_ -- terminates the app"
+                r"_:q_ or _:quit_ -- terminates the app",
+            ),
+            "editor": DrawableEditor(
+                self.main_window,
+                " _____    _   _            \n"
+                "| ____|__| |_| |_ ___  _ _ \n"
+                "|  _| / _` (_) __/ _ \| '_|\n"
+                "| |__| (_| | | || (_) | |  \n"
+                "|_____\__,_|_|\__\___/|_|  \n"
+                "                           ",
             ),
         }
 
@@ -419,8 +471,11 @@ class Interface:
 
     def get_focused(self):
         """Get the focused component."""
-        return self.status_line if self.status_line.is_focused() else self.component_stack[-1]
-        
+        return (
+            self.status_line
+            if self.status_line.is_focused()
+            else self.component_stack[-1]
+        )
 
     def loop(self):
         """The main loop of the program."""
@@ -432,6 +487,8 @@ class Interface:
             else:
                 # send the key to the currently focused component
                 commands = self.get_focused().handle_keypress(k)
+
+                print(commands)
 
                 while len(commands) != 0:
                     command = commands.pop(0)
@@ -496,6 +553,7 @@ class Interface:
 
         self.status_line.set_changed(True)
         self.component_stack[-1].set_changed(True)
+
 
 def run():
     """An entry point to the program."""

@@ -41,9 +41,9 @@ class SetStatusLineTextCommand(StatusLineCommand):
     position: int
 
 @dataclass
-class SetStatusLineModeCommand(StatusLineCommand):
-    """Set the status line mode."""
-    mode: int
+class SetStatusLineStateCommand(StatusLineCommand):
+    """Set the status line state."""
+    state: int
 
 class ClearStatusLineCommand(StatusLineCommand):
     """Clears the contents of the status line."""
