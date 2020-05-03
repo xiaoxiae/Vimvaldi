@@ -18,7 +18,6 @@ class ToggleFocusCommand(GeneralCommand):
     """A command to toggle focus from the status line to the main window."""
 
 
-
 class ComponentCommand(Command):
     """A class for component commands."""
 
@@ -36,15 +35,18 @@ class StatusLineCommand(Command):
     """A class for status line commands."""
 
 @dataclass
-class SetStatusLineText(StatusLineCommand):
+class SetStatusLineTextCommand(StatusLineCommand):
     """Set the status line to the given text."""
     text: str
     position: int
 
 @dataclass
-class SetStatusLineMode(StatusLineCommand):
+class SetStatusLineModeCommand(StatusLineCommand):
     """Set the status line mode."""
     mode: int
+
+class ClearStatusLineCommand(StatusLineCommand):
+    """Clears the contents of the status line."""
 
 
 

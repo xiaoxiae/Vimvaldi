@@ -36,7 +36,7 @@ class Component(ABC, Changeable):
     """A class that is inherited by all of the components."""
 
     @abstractmethod
-    def handle_keypress(self, key: int) -> List[Command]:
+    def handle_keypress(self, key: str) -> List[Command]:
         """Handles a single keypress. Returns the resulting command."""
         pass
 
@@ -55,7 +55,7 @@ class MenuItem:
     tooltip: str
 
 
-class Menu:
+class Menu(Component):
     """A class for working with a menu."""
 
     def __init__(self, items: Sequence[Optional[MenuItem]]):
@@ -90,15 +90,23 @@ class Menu:
         """Return the currently selected MenuItem object."""
         return self.items[self.index]
 
+    def status_line_label_change(self) -> List[Command]:
+        """Return the command necessary for the status line to change label."""
+        return [
+            SetStatusLineTextCommand(self.get_selected().tooltip, StatusLine.position.CENTER)
+        ]
+
     def handle_command(self, Command) -> List[Command]:
         return []  # TODO
 
-    def handle_keypress(self, key: int) -> List[Command]:
+    def handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
             self.next()
+            return self.status_line_label_change()
 
         elif key == "k":
             self.previous()
+            return self.status_line_label_change()
 
         elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
             return [self.get_selected().action]
@@ -115,7 +123,7 @@ class LogoDisplay(Component):
     def __init__(self, text: str):
         self.text = text
 
-    def handle_keypress(self, key: int) -> List[Command]:
+    def handle_keypress(self, key: str) -> List[Command]:
         """Go away from the logo when enter is pressed."""
         if key in (curses.KEY_ENTER, "\n", "\r"):
             return [PopComponentCommand()]
@@ -139,7 +147,7 @@ class TextDisplay(Component):
     def handle_command(self, Command) -> List[Command]:
         return []  # TODO
 
-    def handle_keypress(self, key: int) -> List[Command]:
+    def handle_keypress(self, key: str) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
             self.set_changed(True)
@@ -178,19 +186,34 @@ class StatusLine(Component):
     def set_text(self, position: StatusLine.position, text: str):
         """Change text at the specified position (left/center/right)."""
         self.text[position.value] = text
+        self.set_changed(True)
+
+    def clear_text(self, position: StatusLine.position):
+        self.text[position.value] = ""
+
+        if position.value == 0:
+            self.cursor_offset = 0
+
+        self.set_changed(True)
 
     def clear(self):
         """Clear all text from the StatusLine."""
-        self.text = ["", "", ""]
+        for pos in self.position:
+            self.clear_text(pos)
 
-    def handle_command(self, Command) -> List[Command]:
-        return []  # TODO
+    def handle_command(self, command) -> List[Command]:
+        if isinstance(command, SetStatusLineTextCommand):
+            self.set_text(command.position, command.text)
+        elif isinstance(command, ClearStatusLineCommand):
+            self.clear()
 
-    def handle_keypress(self, key: int) -> List[Command]:
+        return []
+
+    def handle_keypress(self, key: str) -> List[Command]:
+        self.set_changed(True)
+
         # to simplify the code
         pos = self.cursor_offset
-
-        print(key == chr(127))
 
         # backspace: delete previous character
         if key in (curses.KEY_BACKSPACE, "\b", chr(127)):
@@ -202,8 +225,7 @@ class StatusLine(Component):
             # if there is no text left, transfer focus
             else:
                 if len(self.text[0]) == 0:
-                    self.text[0] = ""
-                    self.cursor_offset = 0
+                    self.clear_text(self.position.LEFT)
                     return [ToggleFocusCommand()]
 
         # delete: delete next character
@@ -248,8 +270,7 @@ class StatusLine(Component):
 
             # get and clear the text
             text = self.text[0]
-            self.text[0] = ""
-            self.cursor_offset = 0
+            self.clear_text(self.position.LEFT)
 
             # send an insert command if the mode is insert
             if self.current_state is StatusLine.state.INSERT:

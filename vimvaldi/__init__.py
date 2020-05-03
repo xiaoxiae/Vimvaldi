@@ -76,13 +76,17 @@ class Drawable(ABC, Changeable):
     def __init__(self, window: WindowView):
         self.window = window
 
-    def toggle_focused(self):
+    def toggle_focused(self) -> List[Command]:
         """Toggle the focus on this Drawable."""
-        self.focused = not self.focused
+        return self.set_focused(not self.focused)
 
-    def set_focused(self, value: bool):
-        """Set the focus on this Drawable."""
+    def set_focused(self, value: bool) -> List[Command]:
+        """Set the focus on this Drawable. Possibly return a command if the component
+        wants to do some action (they will override it)."""
         self.focused = value
+        self.set_changed(True)
+
+        return []
 
     def is_focused(self) -> bool:
         """Return True if this Drawable is currently focused."""
@@ -101,6 +105,7 @@ class Drawable(ABC, Changeable):
         if self.has_changed():
             self.window.clear()
             self._draw()
+            self.set_changed(False)
 
         if self.is_focused():
             if self.cursor_position is not None:
@@ -144,6 +149,11 @@ class DrawableMenu(Drawable, Menu):
 
             x_off = center_coordinate(self.window.width(), len(text))
             self.window.addstr(x_off, y_off + len(lines) + 2 + i, text)
+
+
+    def set_focused(self, value: bool) -> List[Command]:
+        Drawable.set_focused(self, value)
+        return self.status_line_label_change()
 
 
 class DrawableLogoDisplay(Drawable, LogoDisplay):
@@ -266,14 +276,19 @@ class DrawableTextDisplay(Drawable, TextDisplay):
             h_level = 0
             y += 1
 
-    def handle_keypress(self, key: int) -> Command:
+    def set_focused(self, value: bool) -> List[Command]:
+        Drawable.set_focused(self, value)
+        return [ClearStatusLineCommand()]
+
+
+    def handle_keypress(self, key: str) -> Command:
         """Expanded because TextDisplay couldn't easily implement ^D and ^U, since it
         doesn't know the current zoom level."""
         # call super for the command
         command = TextDisplay.handle_keypress(self, key)
 
         # if a command was generated, propagate
-        if command is not None:
+        if len(command) != 0:
             return command
 
         # else check for ^D and ^U
@@ -282,11 +297,13 @@ class DrawableTextDisplay(Drawable, TextDisplay):
 
             if key == chr(4):  # ^D
                 self.line_offset += height // 3
-                self.set_changed(True)
+                return self.status_line_label_change()
 
             if key == chr(21):  # ^U
                 self.line_offset -= height // 3
-                self.set_changed(True)
+                return self.status_line_label_change()
+
+        return []
 
 
 class DrawableStatusLine(Drawable, StatusLine):
@@ -328,7 +345,6 @@ class Interface:
         # derive two windows from the current one -- the main one and the status one
         self.main_window = WindowView(window)
         self.status_window = WindowView(window)
-        self.resize_windows()
 
         # initialize the terminal colors
         self.initialize_colors()
@@ -396,6 +412,8 @@ class Interface:
         self.component_stack = [self.components["menu"], self.components["logo"]]
         self.component_stack[-1].set_focused(True)
 
+        self.resize_windows()
+
         # run the program (permanent loop)
         self.loop()
 
@@ -415,7 +433,9 @@ class Interface:
                 # send the key to the currently focused component
                 commands = self.get_focused().handle_keypress(k)
 
-                for command in commands:
+                while len(commands) != 0:
+                    command = commands.pop(0)
+
                     # component commands
                     if isinstance(command, PopComponentCommand):
                         self.component_stack.pop()
@@ -424,16 +444,19 @@ class Interface:
                         if len(self.component_stack) == 0:
                             return
 
-                        self.component_stack[-1].set_focused(True)
+                        commands += self.component_stack[-1].set_focused(True)
 
                     elif isinstance(command, PushComponentCommand):
                         self.component_stack.append(self.components[command.component])
-                        self.status_line.set_focused(False)
-                        self.component_stack[-1].set_focused(True)
+                        commands += self.status_line.set_focused(False)
+                        commands += self.component_stack[-1].set_focused(True)
 
                     elif isinstance(command, ToggleFocusCommand):
-                        self.status_line.toggle_focused()
-                        self.component_stack[-1].toggle_focused()
+                        commands += self.status_line.toggle_focused()
+                        commands += self.component_stack[-1].toggle_focused()
+
+                    elif isinstance(command, StatusLineCommand):
+                        self.status_line.handle_command(command)
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying an error message
@@ -471,6 +494,8 @@ class Interface:
         self.main_window.resize(View(0, 0, width, height - 1))
         self.status_window.resize(View(0, height - 1, width, 1))
 
+        self.status_line.set_changed(True)
+        self.component_stack[-1].set_changed(True)
 
 def run():
     """An entry point to the program."""
