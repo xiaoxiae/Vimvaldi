@@ -11,11 +11,18 @@ class Command:
 class GeneralCommand(Command):
     """Other commands that didn't really fit anywhere else."""
 
-class QuitCommand(GeneralCommand):
-    """A command to quit."""
-
 class ToggleFocusCommand(GeneralCommand):
     """A command to toggle focus from the status line to the main window."""
+
+class QuitCommand(GeneralCommand):
+    """A command to quit."""
+    forced: bool = False  # q!
+
+@dataclass
+class SaveCommand(GeneralCommand):
+    """A command to save."""
+    path: str = None
+
 
 
 class ComponentCommand(Command):

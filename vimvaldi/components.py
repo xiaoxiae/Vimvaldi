@@ -10,6 +10,8 @@ from enum import Enum, auto
 
 import curses
 from vimvaldi.commands import *
+import abjad
+import sys
 
 # DEBUG; TO BE REMOVED
 import logging
@@ -283,8 +285,18 @@ class StatusLine(Component):
             if self.current_state is StatusLine.state.INSERT:
                 commands.append(InsertCommand(text))
             elif self.current_state is StatusLine.state.NORMAL:
-                if text in ("q", "quit"):
+                # TODO: cleaner code?
+                if text.strip() in ("q!", "quit!"):
+                    commands.append(QuitCommand(forced=True))
+                elif text.strip() in ("q", "quit"):
                     commands.append(QuitCommand())
+
+                # TODO wq
+
+                if text.strip().startswith("w"):
+                    filename = text[1:].lstrip()
+                    commands.append(SaveCommand(path=filename))
+
                 elif text in ("help", "info"):
                     commands.append(PushComponentCommand(text))
 
@@ -302,8 +314,14 @@ class Editor(Component):
     """A class for working with the notesheet."""
 
     def __init__(self):
-        # TODO abjad initialization (and everything else)
-        self.score = None
+        self.score = abjad.Container()  # internal note representation
+        self.position = 0  # position within the container
+
+        self.save_file = None  # the file to which to save
+
+    def get_score(self) -> abjad.Container:
+        """Return the abjad container that stores the notes."""
+        return self.score
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key == ":":
@@ -319,5 +337,98 @@ class Editor(Component):
 
         return []
 
-    def handle_command(self, Command) -> List[Command]:
-        return []  # TODO
+    def handle_command(self, command) -> List[Command]:
+        if isinstance(command, InsertCommand):
+            text = command.text
+
+            if len(text) == 0:
+                return []
+
+            if text[0] == "n":
+                try:
+                    note = abjad.Note(text[1:])
+                    self.score.insert(self.position, note)
+                    self.position += 1
+                except Exception as e:
+                    return [
+                        SetStatusLineTextCommand(
+                            "The string could not be parsed.",
+                            StatusLine.position.CENTER,
+                        )
+                    ]
+
+        elif isinstance(command, SaveCommand):
+            path = command.path
+            previous_save_file = self.save_file
+
+            commands = []
+
+            if path is None or len(path) == 0:
+                if self.save_file is None:
+                    return [
+                        SetStatusLineTextCommand(
+                            "No file name.", StatusLine.position.CENTER,
+                        )
+                    ]
+                else:
+                    # TODO: FILE CHECK
+                    path = self.save_file
+            else:
+                # TODO: FILE CHECK
+                self.save_file = path
+                commands += self._get_file_name_command()
+
+            try:
+                with open(self.save_file, "w") as f:
+                    sys.stdout = f
+                    abjad.f(self.score)
+
+            except Exception as e:
+                # restore the previous file name if something went amiss
+                self.save_file = previous_save_file
+
+                # TODO: BETTER EXCEPTIONS
+                return commands + [
+                    SetStatusLineTextCommand(
+                        "Error writing file.", StatusLine.position.CENTER,
+                    )
+                ]
+
+            return commands + [
+                    SetStatusLineTextCommand(
+                        "Saved.", StatusLine.position.CENTER,
+                    )
+                ]
+
+
+        elif isinstance(command, QuitCommand):
+            # if we haven't done anything, simply pop the editor
+            if self.score == abjad.Container() and self.save_file is None:
+                return [PopComponentCommand()]
+
+            # else warn
+            else:
+                return [
+                    SetStatusLineTextCommand(
+                        "Unsaved changes. Please, save with :w or use :q!.",
+                        StatusLine.position.CENTER,
+                    )
+                ]
+
+        return []
+
+    def _get_file_name_command(self) -> List[Command]:
+        """Return the appropriate command for changing the label of the status line."""
+        if self.save_file is None:
+            return [
+                SetStatusLineTextCommand(
+                    "[no file]", StatusLine.position.RIGHT,
+                )
+            ]
+        else:
+            return [
+                SetStatusLineTextCommand(
+                    f"[{self.save_file}]", StatusLine.position.RIGHT,
+                )
+            ]
+        

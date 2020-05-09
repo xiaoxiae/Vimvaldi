@@ -309,7 +309,7 @@ class DrawableStatusLine(Drawable, StatusLine):
         StatusLine.__init__(self)
 
     def _draw(self):
-        # the offsets of each of the text positions
+        # the offsets of each of the text positions (left, center, right)
         offsets = [
             0,
             center_coordinate(self.window.width(), len(self.text[1])),
@@ -330,6 +330,10 @@ class DrawableStatusLine(Drawable, StatusLine):
         else:
             for i, offset in enumerate(offsets):
                 self.window.addstr(offset, 0, self.text[i])
+
+    def set_focused(self, value: bool) -> List[Command]:
+        Drawable.set_focused(self, value)
+        return [ClearStatusLineCommand()]
 
 
 class DrawableEditor(Drawable, Editor):
@@ -364,6 +368,12 @@ class DrawableEditor(Drawable, Editor):
             for y in range(sheet_lines):
                 y += center + len(self.title.splitlines()) + title_sheet_spacing
                 self.window.addstr(x, y, " ", curses.A_UNDERLINE)
+
+
+    def set_focused(self, value: bool) -> List[Command]:
+        """For setting status line information."""
+        Drawable.set_focused(self, value)
+        return self._get_file_name_command()
 
 
 class Interface:
@@ -488,12 +498,10 @@ class Interface:
                 # send the key to the currently focused component
                 commands = self.get_focused().handle_keypress(k)
 
-                print(commands)
-
                 while len(commands) != 0:
                     command = commands.pop(0)
 
-                    # component commands
+                    # pop the component, possibly terminating the app
                     if isinstance(command, PopComponentCommand):
                         self.component_stack.pop()
 
@@ -503,17 +511,24 @@ class Interface:
 
                         commands += self.component_stack[-1].set_focused(True)
 
+                    # add a new component, setting the focus on it
                     elif isinstance(command, PushComponentCommand):
                         self.component_stack.append(self.components[command.component])
                         commands += self.status_line.set_focused(False)
                         commands += self.component_stack[-1].set_focused(True)
 
+                    # toggle focus
                     elif isinstance(command, ToggleFocusCommand):
                         commands += self.status_line.toggle_focused()
                         commands += self.component_stack[-1].toggle_focused()
 
+                    # status line things
                     elif isinstance(command, StatusLineCommand):
-                        self.status_line.handle_command(command)
+                        commands += self.status_line.handle_command(command)
+
+                    # else just let the active component handle it
+                    else:
+                        commands += self.component_stack[-1].handle_command(command)
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying an error message
