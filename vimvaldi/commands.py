@@ -14,15 +14,16 @@ class GeneralCommand(Command):
 class ToggleFocusCommand(GeneralCommand):
     """A command to toggle focus from the status line to the main window."""
 
+@dataclass
 class QuitCommand(GeneralCommand):
-    """A command to quit."""
+    """A command to quit. A nicer version of terminate."""
     forced: bool = False  # q!
 
 @dataclass
 class SaveCommand(GeneralCommand):
     """A command to save."""
     path: str = None
-
+    forced: bool = False  # w!
 
 
 class ComponentCommand(Command):

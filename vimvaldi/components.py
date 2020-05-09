@@ -12,6 +12,7 @@ import curses
 from vimvaldi.commands import *
 import abjad
 import sys
+import os
 
 # DEBUG; TO BE REMOVED
 import logging
@@ -285,17 +286,20 @@ class StatusLine(Component):
             if self.current_state is StatusLine.state.INSERT:
                 commands.append(InsertCommand(text))
             elif self.current_state is StatusLine.state.NORMAL:
-                # TODO: cleaner code?
-                if text.strip() in ("q!", "quit!"):
-                    commands.append(QuitCommand(forced=True))
-                elif text.strip() in ("q", "quit"):
-                    commands.append(QuitCommand())
+                command = text.strip()
 
-                # TODO wq
+                if command[0] == "q":
+                    return commands + [
+                        QuitCommand(
+                            forced=(len(command) >= 2 and command[1] == "!")
+                        )
+                    ]
 
-                if text.strip().startswith("w"):
-                    filename = text[1:].lstrip()
-                    commands.append(SaveCommand(path=filename))
+                elif command[0] == "w":
+                    if len(command) >= 2 and command[1] == "!":
+                        return commands + [SaveCommand(forced=True, path=command[2:].strip())]
+                    else:
+                        return commands + [SaveCommand(forced=False, path=command[1:].strip())]
 
                 elif text in ("help", "info"):
                     commands.append(PushComponentCommand(text))
@@ -318,6 +322,7 @@ class Editor(Component):
         self.position = 0  # position within the container
 
         self.save_file = None  # the file to which to save
+        self.changed_since_saving = False
 
     def get_score(self) -> abjad.Container:
         """Return the abjad container that stores the notes."""
@@ -337,6 +342,17 @@ class Editor(Component):
 
         return []
 
+    def __does_file_exist(self, path: str) -> List[Command]:
+        """Checks the file before saving, possibly generating some error commands."""
+        if os.path.isfile(path) and path != self.save_file:
+            return [
+                SetStatusLineTextCommand(
+                    "The file already exists.", StatusLine.position.CENTER,
+                )
+            ]
+
+        return []
+
     def handle_command(self, command) -> List[Command]:
         if isinstance(command, InsertCommand):
             text = command.text
@@ -349,6 +365,7 @@ class Editor(Component):
                     note = abjad.Note(text[1:])
                     self.score.insert(self.position, note)
                     self.position += 1
+                    self.changed_since_saving = True
                 except Exception as e:
                     return [
                         SetStatusLineTextCommand(
@@ -371,10 +388,16 @@ class Editor(Component):
                         )
                     ]
                 else:
-                    # TODO: FILE CHECK
+                    file_status = self.__does_file_exist(path)
+                    if len(file_status) != 0 and not command.forced:
+                        return file_status
+
                     path = self.save_file
             else:
-                # TODO: FILE CHECK
+                file_status = self.__does_file_exist(path)
+                if len(file_status) != 0 and not command.forced:
+                    return file_status
+
                 self.save_file = path
                 commands += self._get_file_name_command()
 
@@ -382,6 +405,7 @@ class Editor(Component):
                 with open(self.save_file, "w") as f:
                     sys.stdout = f
                     abjad.f(self.score)
+                    self.changed_since_saving = False
 
             except Exception as e:
                 # restore the previous file name if something went amiss
@@ -395,40 +419,35 @@ class Editor(Component):
                 ]
 
             return commands + [
-                    SetStatusLineTextCommand(
-                        "Saved.", StatusLine.position.CENTER,
-                    )
-                ]
-
+                SetStatusLineTextCommand("Saved.", StatusLine.position.CENTER,)
+            ]
 
         elif isinstance(command, QuitCommand):
             # if we haven't done anything, simply pop the editor
-            if self.score == abjad.Container() and self.save_file is None:
+            if not self.changed_since_saving:
                 return [PopComponentCommand()]
 
             # else warn
             else:
-                return [
-                    SetStatusLineTextCommand(
-                        "Unsaved changes. Please, save with :w or use :q!.",
-                        StatusLine.position.CENTER,
-                    )
-                ]
+                if command.forced:
+                    return [PopComponentCommand()]
+                else:
+                    return [
+                        SetStatusLineTextCommand(
+                            "Unsaved changes. Save with :w or use :q!.",
+                            StatusLine.position.CENTER,
+                        )
+                    ]
 
         return []
 
     def _get_file_name_command(self) -> List[Command]:
         """Return the appropriate command for changing the label of the status line."""
         if self.save_file is None:
-            return [
-                SetStatusLineTextCommand(
-                    "[no file]", StatusLine.position.RIGHT,
-                )
-            ]
+            return [SetStatusLineTextCommand("[no file]", StatusLine.position.RIGHT,)]
         else:
             return [
                 SetStatusLineTextCommand(
                     f"[{self.save_file}]", StatusLine.position.RIGHT,
                 )
             ]
-        

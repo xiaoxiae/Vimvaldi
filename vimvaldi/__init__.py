@@ -369,7 +369,6 @@ class DrawableEditor(Drawable, Editor):
                 y += center + len(self.title.splitlines()) + title_sheet_spacing
                 self.window.addstr(x, y, " ", curses.A_UNDERLINE)
 
-
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
@@ -420,9 +419,8 @@ class Interface:
                 "|_|  |_|\___|_| |_|\__,_|",
                 [
                     MenuItem(
-                        "CREATE", PushComponentCommand("editor"), "Creates a new score."
+                        "EDIT", PushComponentCommand("editor"), "Creates a new score."
                     ),
-                    MenuItem("IMPORT", None, "Imports a score from a file."),
                     None,
                     MenuItem(
                         "HELP",
