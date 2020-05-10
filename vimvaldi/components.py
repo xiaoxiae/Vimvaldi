@@ -290,16 +290,18 @@ class StatusLine(Component):
 
                 if command[0] == "q":
                     return commands + [
-                        QuitCommand(
-                            forced=(len(command) >= 2 and command[1] == "!")
-                        )
+                        QuitCommand(forced=(len(command) >= 2 and command[1] == "!"))
                     ]
 
                 elif command[0] == "w":
                     if len(command) >= 2 and command[1] == "!":
-                        return commands + [SaveCommand(forced=True, path=command[2:].strip())]
+                        return commands + [
+                            SaveCommand(forced=True, path=command[2:].strip())
+                        ]
                     else:
-                        return commands + [SaveCommand(forced=False, path=command[1:].strip())]
+                        return commands + [
+                            SaveCommand(forced=False, path=command[1:].strip())
+                        ]
 
                 elif text in ("help", "info"):
                     commands.append(PushComponentCommand(text))
@@ -318,7 +320,13 @@ class Editor(Component):
     """A class for working with the notesheet."""
 
     def __init__(self):
-        self.score = abjad.Container()  # internal note representation
+        # internal note representation (with some defaults)
+        self.score = abjad.Score()
+
+        self.key = abjad.KeySignature("c", "major")
+        self.clef = abjad.Clef("treble")
+        self.time = abjad.TimeSignature((4, 4))
+
         self.position = 0  # position within the container
 
         self.save_file = None  # the file to which to save
@@ -354,28 +362,34 @@ class Editor(Component):
         return []
 
     def handle_command(self, command) -> List[Command]:
+        # attempt to parse the insert command
         if isinstance(command, InsertCommand):
             text = command.text
 
             if len(text) == 0:
                 return []
 
-            if text[0] == "n":
-                try:
-                    note = abjad.Note(text[1:])
-                    self.score.insert(self.position, note)
-                    self.position += 1
-                    self.changed_since_saving = True
-                except Exception as e:
-                    return [
-                        SetStatusLineTextCommand(
-                            "The string could not be parsed.",
-                            StatusLine.position.CENTER,
-                        )
-                    ]
+            try:
+                if text[0] == "r":
+                    obj = abjad.Rest(text)
+                elif text[0] == "<":
+                    obj = abjad.Chord(text)
+                else:
+                    obj = abjad.Note(text)
+
+                self.score.insert(self.position, obj)
+                self.position += 1
+                self.changed_since_saving = True
+
+            except Exception as e:
+                return [
+                    SetStatusLineTextCommand(
+                        "The string could not be parsed.", StatusLine.position.CENTER,
+                    )
+                ]
 
         elif isinstance(command, SaveCommand):
-            path = command.path
+            path = command.path  # the path to save file to
             previous_save_file = self.save_file
 
             commands = []
@@ -427,7 +441,7 @@ class Editor(Component):
             if not self.changed_since_saving:
                 return [PopComponentCommand()]
 
-            # else warn
+            # else warn that we can't just pop the editor
             else:
                 if command.forced:
                     return [PopComponentCommand()]

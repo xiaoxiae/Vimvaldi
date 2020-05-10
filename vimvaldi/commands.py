@@ -58,7 +58,11 @@ class ClearStatusLineCommand(StatusLineCommand):
 
 
 
+class EditorCommand(Command):
+    """Commands that concern the note editor."""
+
+
 @dataclass
-class InsertCommand(Command):
+class InsertCommand(EditorCommand):
     """The command that gets passed to the editor to deal with."""
     text: str
