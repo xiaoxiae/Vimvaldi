@@ -486,13 +486,13 @@ class Interface:
         # run the program (permanent loop)
         self.loop()
 
-        def get_focused(self):
-            """Get the focused component."""
-            return (
-                self.status_line
-            if self.status_line.is_focused()
-            else self.component_stack[-1]
-        )
+    def get_focused(self):
+        """Get the focused component."""
+        return (
+            self.status_line
+        if self.status_line.is_focused()
+        else self.component_stack[-1]
+    )
 
     def loop(self):
         """The main loop of the program."""
