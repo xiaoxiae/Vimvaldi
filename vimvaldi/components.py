@@ -354,7 +354,7 @@ class Editor(Component):
 
         self.position = 0  # position within the container
 
-        self.save_file = None  # the file to which to save
+        self.current_file_path = None  # the file to which to save
         self.changed_since_saving = False
 
     def get_score(self) -> abjad.Container:
@@ -375,106 +375,149 @@ class Editor(Component):
 
         return []
 
-    def __valid_save_path(self, path: str) -> List[Command]:
+    def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
-        it matches the self.save_file path. Returns the appropriate commands if it
+        it matches the self.current_file_path path. Returns the appropriate commands if it
         doesn't."""
-        if os.path.isfile(path) and path != self.save_file:
+        return (
+            [SetStatusLineTextCommand("The file already exists.", Position.CENTER)]
+            if os.path.isfile(path) and path != self.current_file_path
+            else []
+        )
+
+    def handle_command(self, command) -> List[Command]:
+        if isinstance(command, InsertCommand):
+            return self.__handle_insert_command(command)
+
+        elif isinstance(command, SaveCommand):
+            return self.__handle_save_command(command)
+
+        elif isinstance(command, QuitCommand):
+            return self.__handle_quit_command(command)
+
+        elif isinstance(command, OpenCommand):
+            return self.__handle_open_command(command)
+
+        return []
+
+    def __handle_insert_command(self, command: InsertCommand) -> List[Command]:
+        """Attempt to parse whatever the InsertCommand contains. Return either [] if
+        successful or a command that sets the status line text to what happened."""
+        text = command.text
+
+        if len(text) == 0:
+            return []
+
+        try:
+            if text[0] == "r":
+                obj = abjad.Rest(text)
+            elif text[0] == "<":
+                obj = abjad.Chord(text)
+            else:
+                obj = abjad.Note(text)
+
+            self.score.insert(self.position, obj)
+            self.position += 1
+            self.changed_since_saving = True
+
+        except Exception as e:
             return [
-                SetStatusLineTextCommand("The file already exists.", Position.CENTER)
+                SetStatusLineTextCommand(
+                    "The string could not be parsed.", Position.CENTER
+                )
             ]
 
         return []
 
-    def handle_command(self, command) -> List[Command]:
-        # attempt to parse the insert command
-        if isinstance(command, InsertCommand):
-            text = command.text
+    def __handle_save_command(self, command: SaveCommand) -> List[Command]:
+        path = command.path  # the path to save file to
+        previous_save_file = self.current_file_path
 
-            if len(text) == 0:
-                return []
+        if path is None:
+            # if there isn't a file currently open, warn
+            if self.current_file_path is None:
+                return [self.__get_empty_name_warning()]
 
-            try:
-                if text[0] == "r":
-                    obj = abjad.Rest(text)
-                elif text[0] == "<":
-                    obj = abjad.Chord(text)
-                else:
-                    obj = abjad.Note(text)
-
-                self.score.insert(self.position, obj)
-                self.position += 1
-                self.changed_since_saving = True
-
-            except Exception as e:
-                return [
-                    SetStatusLineTextCommand(
-                        "The string could not be parsed.", Position.CENTER,
-                    )
-                ]
-
-        elif isinstance(command, SaveCommand):
-            path = command.path  # the path to save file to
-            previous_save_file = self.save_file
-
-            commands = []
-
-            if path is None or len(path) == 0:
-                if self.save_file is None:
-                    return [SetStatusLineTextCommand("No file name.", Position.CENTER,)]
-                else:
-                    path = self.save_file
-
-                    file_status = self.__valid_save_path(path)
-                    if len(file_status) != 0 and not command.forced:
-                        return file_status
+            # else set the command file to the current file
             else:
-                file_status = self.__valid_save_path(path)
-                if len(file_status) != 0 and not command.forced:
-                    return file_status
+                path = self.current_file_path
 
-                self.save_file = path
-                commands += self.get_file_name_commands()
+        file_status = self.__save_path_valid(path)
+        if len(file_status) != 0 and not command.forced:
+            return file_status
 
-            try:
-                with open(self.save_file, "w") as f:
-                    sys.stdout = f
-                    abjad.f(self.score)
-                    self.changed_since_saving = False
+        self.current_file_path = path
 
-            except Exception as e:
-                # restore the previous file name if something went amiss
-                self.save_file = previous_save_file
+        # attempt to write the score to the file
+        try:
+            with open(self.current_file_path, "w") as f:
+                sys.stdout = f  # abjad prints to stdout and we don't want that
+                abjad.f(self.score)
+                self.changed_since_saving = False
 
-                # TODO: BETTER EXCEPTIONS
-                return commands + [
-                    SetStatusLineTextCommand("Error writing file.", Position.CENTER,)
-                ]
+        except Exception as e:
+            # restore the previous file name if something went amiss (we didn't save...)
+            self.current_file_path = previous_save_file
 
-            return commands + [SetStatusLineTextCommand("Saved.", Position.CENTER,)]
+            # TODO: BETTER EXCEPTIONS
+            return [SetStatusLineTextCommand("Error writing to file.", Position.CENTER)]
 
-        elif isinstance(command, QuitCommand):
-            # if we haven't done anything, simply pop the editor
-            if not self.changed_since_saving:
-                return [PopComponentCommand()]
+        # if everything went fine, let the user know
+        return [
+            self.get_file_name_command(),
+            SetStatusLineTextCommand("Saved.", Position.CENTER),
+        ]
 
-            # else warn that we can't just pop the editor
-            else:
-                if command.forced:
-                    return [PopComponentCommand()]
-                else:
-                    return [
-                        SetStatusLineTextCommand(
-                            "Unsaved changes. Save with :w or use :q!.",
-                            Position.CENTER,
-                        )
-                    ]
+    def __handle_open_command(self, command: OpenCommand) -> List[Command]:
+        """Attempt to open the specified file."""
+        path = command.path
 
-        return []
+        if self.changed_since_saving and not command.forced:
+            return [self.__get_unsaved_changes_warning()]
 
-    def get_file_name_commands(self) -> List[Command]:
-        """Return the appropriate command for changing the label of the status line."""
-        if self.save_file is None:
-            return [SetStatusLineTextCommand("[no file]", Position.RIGHT,)]
-        else:
-            return [SetStatusLineTextCommand(f"[{self.save_file}]", Position.RIGHT,)]
+        if path is None:
+            return [self.__get_empty_name_warning()]
+
+        # attempt to read the score from
+        try:
+            with open(path, "r") as f:
+                self.score = abjad.Score(f.read())
+
+            self.changed_since_saving = False
+            self.current_file_path = path
+
+        except Exception as e:
+            return [
+                SetStatusLineTextCommand("Error reading the file.", Position.CENTER,)
+            ]
+
+        return [
+            self.get_file_name_command(),
+            SetStatusLineTextCommand("Opened.", Position.CENTER,),
+        ]
+
+    def __handle_quit_command(self, command: QuitCommand) -> List[Command]:
+        """Quit (if there are either no unsaved changes or the command is forced), else
+        warn about there being unsaved changes."""
+        return (
+            [PopComponentCommand()]
+            if not self.changed_since_saving or command.forced
+            else [self.__get_unsaved_changes_warning()]
+        )
+
+    def __get_unsaved_changes_warning(self) -> Command:
+        """Return the warning command issued when there are unsaved changes."""
+        text = "Unsaved changes (maybe append '!'?)."
+        return SetStatusLineTextCommand(text, Position.CENTER)
+
+    def __get_empty_name_warning(self) -> Command:
+        return SetStatusLineTextCommand("No file name.", Position.CENTER)
+
+    def get_file_name_command(self) -> Command:
+        """Return the appropriate command for changing the label of the status line to
+        the currently opened file."""
+        return (
+            SetStatusLineTextCommand("[no file]", Position.RIGHT)
+            if self.current_file_path is None
+            else SetStatusLineTextCommand(f"[{self.current_file_path}]", Position.RIGHT)
+        )

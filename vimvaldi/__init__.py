@@ -357,7 +357,7 @@ class DrawableEditor(Drawable, Editor):
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
-        return [ClearStatusLineCommand()] + self.get_file_name_commands()
+        return [ClearStatusLineCommand(), self.get_file_name_command()]
 
 
 class Interface:
