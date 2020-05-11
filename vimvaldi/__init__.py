@@ -436,21 +436,26 @@ class Interface:
 
     def loop(self):
         """The main loop of the program."""
+        # is set when the terminal is too small to draw the currently active component
+        # done so all input to the active component (keystrokes) is disabled
+        terminal_too_small = False  
+
         k = None
         while True:
             # special window resize event handling
             if k == curses.KEY_RESIZE:
                 self.resize_windows()
             else:
-                # send the key to the currently focused component
-                self.resolve_commands(self.get_focused().handle_keypress(k))
+                # possibly send the key to the currently focused component
+                if not terminal_too_small:
+                    self.resolve_commands(self.get_focused().handle_keypress(k))
 
-            # redraw the component and the status line
-            # check for errors when drawing, possibly displaying an error message
             try:
-                # update the components
+                # redraw the component and the status line
                 self.component_stack[-1].draw()
                 self.status_line.draw()
+
+                terminal_too_small = False
 
             except curses.error:
                 # TODO better error handling
@@ -462,6 +467,8 @@ class Interface:
                 self.window.addstr(
                     height // 2, center_coordinate(width, len(error_text)), error_text,
                 )
+
+                terminal_too_small = True
 
             # wait for the next character
             # done to handle ^C gracefully, since curses sends an error
