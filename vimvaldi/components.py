@@ -202,6 +202,7 @@ class StatusLine(Component):
     def clear_text(self, position: Position):
         self.text[position.value] = ""
 
+        # also reset the cursor if the left position is changed
         if position.value == 0:
             self.cursor_offset = 0
 

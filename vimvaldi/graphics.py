@@ -49,13 +49,13 @@ help_text = r"""# Help
 The following page contains instructions on using the app.
 
 ## Commands
-Here is a list of commands that can be issued from pretty much anywhere within the app, simply by typing them.
 
 ### General
 _:help_ | display this page
 _:info_ | display the info page
 
 ### I\/O
+Note that these commands can only be issued from the editor.
 _:q[!]_ or _:quit[!]_                | terminate the app [without saving]
 _:w[!] [path]_ or _:write[!] [path]_ | [forcibly] save [to the specified path]
 _:o[!] path_ or _:open[!] path_      | open file [discarding current]
