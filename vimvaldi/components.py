@@ -296,7 +296,7 @@ class StatusLine(Component):
 
                 # help and info screens from anywhere
                 if command in ("help", "info"):
-                    commands.append(PushComponentCommand(text))
+                    commands.append(PushComponentCommand(command))
 
                 if len(command_parts) != 0:
                     if command in ("q", "quit"):
