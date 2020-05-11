@@ -2,11 +2,12 @@
 
 import curses
 from typing import *
+from enum import Enum, auto
 
 
 def center_coordinate(a: int, b: int) -> int:
-    """Return the starting coordinate of an object of size b centered in an object 
-    of size a."""
+    """Return the starting coordinate of an object of size b centered in an object of
+    size a."""
     return (a // 2) - (b // 2) - b % 2
 
 
@@ -32,3 +33,18 @@ def draw_vertical_bar(window, x: int, y_s: int, y_e: int):
     """Draw the vertial bar on the window (with underlines!)."""
     for i in range(y_s, y_e):
         window.addstr(i, x, "|", curses.A_UNDERLINE)
+
+
+class Position(Enum):
+    """For left/midde/right."""
+
+    LEFT = 0
+    CENTER = 1
+    RIGHT = 2
+
+
+class State(Enum):
+    """States that the status line can be in: either normal or insert."""
+
+    NORMAL = auto()
+    INSERT = auto()

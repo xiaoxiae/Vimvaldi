@@ -1,6 +1,7 @@
 """A module for working with command."""
 from dataclasses import dataclass
-from enum import Enum
+
+from vimvaldi.utilities import *
 
 
 @dataclass
@@ -32,6 +33,7 @@ class SaveCommand(IOCommand):
 @dataclass
 class OpenCommand(IOCommand):
     path: str = None
+    forced: bool = False  # o! (overwrite currently open file)
 
 
 
@@ -55,12 +57,12 @@ class StatusLineCommand(Command):
 class SetStatusLineTextCommand(StatusLineCommand):
     """Set the status line to the given text."""
     text: str
-    position: Enum
+    position: Position
 
 @dataclass
 class SetStatusLineStateCommand(StatusLineCommand):
     """Set the status line state."""
-    state: Enum
+    state: State
 
 class ClearStatusLineCommand(StatusLineCommand):
     """Clears the contents of the status line."""

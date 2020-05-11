@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import curses
-import logging # DEBUG; TO BE REMOVED
+import logging  # DEBUG; TO BE REMOVED
 import os
 import sys
 from abc import ABC, abstractmethod
-from enum import auto
 from typing import *
 from signal import signal, SIGINT
-
 
 import abjad
 
 from vimvaldi.commands import *
+
 
 # TODO remove -- just for debug
 logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
@@ -94,13 +93,11 @@ class Menu(Component):
         """Return the currently selected MenuItem object."""
         return self.items[self.index]
 
-    def status_line_label_change(self) -> List[Command]:
+    def update_status_line(self) -> List[Command]:
         """Return the command necessary for the status line to change label."""
         return [
             ClearStatusLineCommand(),
-            SetStatusLineTextCommand(
-                self.get_selected().tooltip, StatusLine.position.CENTER
-            ),
+            SetStatusLineTextCommand(self.get_selected().tooltip, Position.CENTER),
         ]
 
     def handle_command(self, command) -> List[Command]:
@@ -112,19 +109,19 @@ class Menu(Component):
     def handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
             self.next()
-            return self.status_line_label_change()
+            return self.update_status_line()
 
         elif key == "k":
             self.previous()
-            return self.status_line_label_change()
+            return self.update_status_line()
 
         elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
             return self.get_selected().commands
 
-        elif key == (":"):
+        elif key == ":":
             return [
                 ToggleFocusCommand(),
-                SetStatusLineStateCommand(StatusLine.state.NORMAL),
+                SetStatusLineStateCommand(State.NORMAL),
             ]
 
         return []
@@ -183,17 +180,8 @@ class TextDisplay(Component):
 class StatusLine(Component):
     """A class for inputting/displaying information for the app."""
 
-    class position(Enum):
-        LEFT = 0
-        CENTER = 1
-        RIGHT = 2
-
-    class state(Enum):
-        NORMAL = auto()
-        INSERT = auto()
-
     # the current state of the status line
-    current_state = state.NORMAL
+    current_state = State.NORMAL
 
     def __init__(self):
         self.text = ["", "", ""]  # left, center, right text
@@ -201,17 +189,17 @@ class StatusLine(Component):
         # current position of the cursor on the status line
         self.cursor_offset = 0
 
-    def set_text(self, position: StatusLine.position, text: str):
+    def set_text(self, position: Position, text: str):
         """Change text at the specified position (left/center/right). Also, if the
         position is left, move the cursor to the very end (done when adding a partial
         command, for example)."""
         self.text[position.value] = text
         self.set_changed(True)
 
-        if position == StatusLine.position.LEFT:
+        if position == Position.LEFT:
             self.cursor_offset = len(self.text[position.value])
 
-    def clear_text(self, position: StatusLine.position):
+    def clear_text(self, position: Position):
         self.text[position.value] = ""
 
         if position.value == 0:
@@ -221,7 +209,7 @@ class StatusLine(Component):
 
     def clear(self):
         """Clear all text from the StatusLine."""
-        for pos in self.position:
+        for pos in Position:
             self.clear_text(pos)
 
     def handle_command(self, command) -> List[Command]:
@@ -250,7 +238,7 @@ class StatusLine(Component):
             # if there is no text left, transfer focus
             else:
                 if len(self.text[0]) == 0:
-                    self.clear_text(self.position.LEFT)
+                    self.clear_text(Position.LEFT)
                     return [ToggleFocusCommand()]
 
         # delete: delete next character
@@ -295,14 +283,14 @@ class StatusLine(Component):
 
             # get and clear the text
             text = self.text[0]
-            self.clear_text(self.position.LEFT)
+            self.clear_text(Position.LEFT)
 
             # send an insert command if the mode is insert
-            if self.current_state is StatusLine.state.INSERT:
+            if self.current_state is State.INSERT:
                 commands.append(InsertCommand(text))
 
             # else parse the various : commands
-            elif self.current_state is StatusLine.state.NORMAL:
+            elif self.current_state is State.NORMAL:
                 command = text.strip()
                 command_parts = command.split()
 
@@ -330,6 +318,9 @@ class StatusLine(Component):
 
                     if command_parts[0] in ("o", "open"):
                         commands += [OpenCommand(path=possible_path)]
+
+                    if command_parts[0] in ("o!", "open!"):
+                        commands += [OpenCommand(forced=True, path=possible_path)]
 
                     if command_parts[0] == "wq":
                         commands += [SaveCommand(path=possible_path), QuitCommand()]
@@ -374,23 +365,23 @@ class Editor(Component):
         if key == ":":
             return [
                 ToggleFocusCommand(),
-                SetStatusLineStateCommand(StatusLine.state.NORMAL),
+                SetStatusLineStateCommand(State.NORMAL),
             ]
         elif key == "i":
             return [
                 ToggleFocusCommand(),
-                SetStatusLineStateCommand(StatusLine.state.INSERT),
+                SetStatusLineStateCommand(State.INSERT),
             ]
 
         return []
 
-    def __does_file_exist(self, path: str) -> List[Command]:
-        """Checks the file before saving, possibly generating some error commands."""
+    def __valid_save_path(self, path: str) -> List[Command]:
+        """Checks, whether we can save to this path -- if it either doesn't exist or
+        it matches the self.save_file path. Returns the appropriate commands if it
+        doesn't."""
         if os.path.isfile(path) and path != self.save_file:
             return [
-                SetStatusLineTextCommand(
-                    "The file already exists.", StatusLine.position.CENTER,
-                )
+                SetStatusLineTextCommand("The file already exists.", Position.CENTER)
             ]
 
         return []
@@ -418,7 +409,7 @@ class Editor(Component):
             except Exception as e:
                 return [
                     SetStatusLineTextCommand(
-                        "The string could not be parsed.", StatusLine.position.CENTER,
+                        "The string could not be parsed.", Position.CENTER,
                     )
                 ]
 
@@ -430,19 +421,15 @@ class Editor(Component):
 
             if path is None or len(path) == 0:
                 if self.save_file is None:
-                    return [
-                        SetStatusLineTextCommand(
-                            "No file name.", StatusLine.position.CENTER,
-                        )
-                    ]
+                    return [SetStatusLineTextCommand("No file name.", Position.CENTER,)]
                 else:
                     path = self.save_file
 
-                    file_status = self.__does_file_exist(path)
+                    file_status = self.__valid_save_path(path)
                     if len(file_status) != 0 and not command.forced:
                         return file_status
             else:
-                file_status = self.__does_file_exist(path)
+                file_status = self.__valid_save_path(path)
                 if len(file_status) != 0 and not command.forced:
                     return file_status
 
@@ -461,14 +448,10 @@ class Editor(Component):
 
                 # TODO: BETTER EXCEPTIONS
                 return commands + [
-                    SetStatusLineTextCommand(
-                        "Error writing file.", StatusLine.position.CENTER,
-                    )
+                    SetStatusLineTextCommand("Error writing file.", Position.CENTER,)
                 ]
 
-            return commands + [
-                SetStatusLineTextCommand("Saved.", StatusLine.position.CENTER,)
-            ]
+            return commands + [SetStatusLineTextCommand("Saved.", Position.CENTER,)]
 
         elif isinstance(command, QuitCommand):
             # if we haven't done anything, simply pop the editor
@@ -483,7 +466,7 @@ class Editor(Component):
                     return [
                         SetStatusLineTextCommand(
                             "Unsaved changes. Save with :w or use :q!.",
-                            StatusLine.position.CENTER,
+                            Position.CENTER,
                         )
                     ]
 
@@ -492,10 +475,6 @@ class Editor(Component):
     def get_file_name_commands(self) -> List[Command]:
         """Return the appropriate command for changing the label of the status line."""
         if self.save_file is None:
-            return [SetStatusLineTextCommand("[no file]", StatusLine.position.RIGHT,)]
+            return [SetStatusLineTextCommand("[no file]", Position.RIGHT,)]
         else:
-            return [
-                SetStatusLineTextCommand(
-                    f"[{self.save_file}]", StatusLine.position.RIGHT,
-                )
-            ]
+            return [SetStatusLineTextCommand(f"[{self.save_file}]", Position.RIGHT,)]

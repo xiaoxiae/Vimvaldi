@@ -4,6 +4,7 @@ import argparse
 
 from vimvaldi.components import *
 from vimvaldi.utilities import *
+from vimvaldi.graphics import *
 
 
 @dataclass
@@ -139,7 +140,7 @@ class DrawableMenu(Drawable, Menu):
         """If the focus switched to the menu, set the status line according to the
         currently selected item."""
         Drawable.set_focused(self, value)
-        return [] if not value else self.status_line_label_change()
+        return [] if not value else self.update_status_line()
 
 
 class DrawableLogoDisplay(Drawable, LogoDisplay):
@@ -282,11 +283,11 @@ class DrawableTextDisplay(Drawable, TextDisplay):
 
             if key == chr(4):  # ^D
                 self.line_offset += height // 3
-                return self.status_line_label_change()
+                self.set_changed(True)
 
             if key == chr(21):  # ^U
                 self.line_offset -= height // 3
-                return self.status_line_label_change()
+                self.set_changed(True)
 
         return []
 
@@ -308,9 +309,9 @@ class DrawableStatusLine(Drawable, StatusLine):
             command_text = self.text[0]
             cursor_offset = self.cursor_offset
 
-            if self.current_state is StatusLine.state.NORMAL:
+            if self.current_state is State.NORMAL:
                 command_text = ":" + command_text
-            elif self.current_state is StatusLine.state.INSERT:
+            elif self.current_state is State.INSERT:
                 command_text = ">" + command_text
 
             self.window.addstr(0, 0, command_text)
@@ -377,30 +378,10 @@ class Interface:
         self.status_line = DrawableStatusLine(self.status_window)
 
         self.components = {
-            "logo": DrawableLogoDisplay(
-                self.main_window,
-                "     ________  **    ________               \n"
-                "    /        \****  /        \              \n"
-                "    \        /******\        /              \n"
-                "     |      |********/      /'              \n"
-                "     |      |******/      /'                \n"
-                "    *|      |****/      /'                  \n"
-                "  ***|      |**/      /'****                \n"
-                "*****|      |/      /'********              \n"
-                "  ***|            /'*********               \n"
-                "    *|      _   /'*********       _     _ _ \n"
-                "     |     (_)/'__ _____   ____ _| | __| (_)\n"
-                "     |     | | '_ V _ \ \ / / _` | |/ _` | |\n"
-                "     |    /| | | | | | \ V / (_| | | (_| | |\n"
-                "     |__/' |_|_| |_| |_|\_/ \__._|_|\__,_|_|",
-            ),
+            "logo": DrawableLogoDisplay(self.main_window, vimvaldi_logo),
             "menu": DrawableMenu(
                 self.main_window,
-                " __  __                  \n"
-                "|  \/  | ___ _ __  _   _ \n"
-                "| |\/| |/ _ \ '_ \| | | |\n"
-                "| |  | |  __/ | | | |_| |\n"
-                "|_|  |_|\___|_| |_|\__,_|",
+                menu_logo,
                 [
                     MenuItem(
                         "EDIT", [PushComponentCommand("editor")], "Creates a new score."
@@ -409,7 +390,7 @@ class Interface:
                         "OPEN",
                         [
                             ToggleFocusCommand(),
-                            SetStatusLineTextCommand("open ", StatusLine.position.LEFT),
+                            SetStatusLineTextCommand("open ", Position.LEFT),
                         ],
                         "Opens an existing score.",
                     ),
@@ -430,35 +411,9 @@ class Interface:
                     ),
                 ],
             ),
-            "info": DrawableTextDisplay(
-                self.main_window,
-                r"# Info" + "\n"
-                r"The following page contains relevant information about the app."
-                + "\n\n"
-                r"## History" + "\n"
-                r"This project was created as a semester project for the AP Programming Course at the Charles University (/http:\/\/mj.ucw.cz\/vyuka\/1920\/p1x\//)."
-                + "\n\n"
-                r"## Source Code" + "\n"
-                r"The code is licensed under MIT and freely available from /https:\/\/github.com\/xiaoxiae\/Vimvaldi\//, so feel free do whatever you want with it :-). Also feel free to submit a pull request if there's something you'd like to see changed or implemented!",
-            ),
-            "help": DrawableTextDisplay(
-                self.main_window,
-                r"# Help" + "\n"
-                r"The following page contains instructions on using the app." + "\n\n"
-                r"## General commands (can be run from anywhere within the app)" + "\n"
-                r"_:help_       -- displays this page" + "\n"
-                r"_:info_       -- displays the info page" + "\n"
-                r"_:q_ or _:quit_ -- terminates the app",
-            ),
-            "editor": DrawableEditor(
-                self.main_window,
-                " _____    _   _            \n"
-                "| ____|__| |_| |_ ___  _ _ \n"
-                "|  _| / _` (_) __/ _ \| '_|\n"
-                "| |__| (_| | | || (_) | |  \n"
-                "|_____\__,_|_|\__\___/|_|  \n"
-                "                           ",
-            ),
+            "info": DrawableTextDisplay(self.main_window, info_text),
+            "help": DrawableTextDisplay(self.main_window, help_text),
+            "editor": DrawableEditor(self.main_window, editor_logo),
         }
 
         # the stack of the currently active components
@@ -475,9 +430,9 @@ class Interface:
         """Get the focused component."""
         return (
             self.status_line
-        if self.status_line.is_focused()
-        else self.component_stack[-1]
-    )
+            if self.status_line.is_focused()
+            else self.component_stack[-1]
+        )
 
     def loop(self):
         """The main loop of the program."""
