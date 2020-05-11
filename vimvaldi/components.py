@@ -337,7 +337,7 @@ class Editor(Component):
 
     def __init__(self):
         # internal note representation (with some defaults)
-        self.score = abjad.Score()
+        self.score = abjad.Score(simultaneous=False)
 
         self.key = abjad.KeySignature("c", "major")
         self.clef = abjad.Clef("treble")
