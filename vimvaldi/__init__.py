@@ -460,7 +460,7 @@ class Interface:
 
                 self.window.clear()
                 self.window.addstr(
-                    center_coordinate(width, len(error_text)), height // 2, error_text,
+                    height // 2, center_coordinate(width, len(error_text)), error_text,
                 )
 
             # wait for the next character
