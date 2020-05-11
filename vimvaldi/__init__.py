@@ -3,6 +3,7 @@
 
 from typing import *
 from dataclasses import dataclass
+import argparse
 
 from abc import ABC, abstractmethod
 
@@ -378,7 +379,7 @@ class DrawableEditor(Drawable, Editor):
 class Interface:
     """A high-level class for rendering the user interface."""
 
-    def __init__(self, window):
+    def __init__(self, window, arguments):
         # window setup
         self.window = window
 
@@ -577,7 +578,11 @@ class Interface:
 
 def run():
     """An entry point to the program."""
-    curses.wrapper(Interface)
+    parser = argparse.ArgumentParser(
+        description="A terminal note sheet editor with Vim-like keybindings.",
+    )
+
+    curses.wrapper(Interface, parser.parse_args())
 
 
 if __name__ == "__main__":
