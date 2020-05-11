@@ -158,8 +158,8 @@ class TextDisplay(Component):
         self.line_offset = 0
 
     def handle_command(self, Command) -> List[Command]:
-        """Don't handle any commands."""
-        return []
+        """If quit command is received, return a PopComponentCommand."""
+        return [PopComponentCommand()]
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
