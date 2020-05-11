@@ -285,26 +285,42 @@ class StatusLine(Component):
             # send an insert command if the mode is insert
             if self.current_state is StatusLine.state.INSERT:
                 commands.append(InsertCommand(text))
+
+            # else parse the various : commands
             elif self.current_state is StatusLine.state.NORMAL:
                 command = text.strip()
+                command_parts = command.split()
 
-                if command[0] == "q":
-                    return commands + [
-                        QuitCommand(forced=(len(command) >= 2 and command[1] == "!"))
-                    ]
+                edit_commands = []
 
-                elif command[0] == "w":
-                    if len(command) >= 2 and command[1] == "!":
-                        return commands + [
-                            SaveCommand(forced=True, path=command[2:].strip())
-                        ]
-                    else:
-                        return commands + [
-                            SaveCommand(forced=False, path=command[1:].strip())
-                        ]
-
-                elif text in ("help", "info"):
+                # help and info screens from anywhere
+                if command in ("help", "info"):
                     commands.append(PushComponentCommand(text))
+
+                if len(command_parts) != 0:
+                    if command in ("q", "quit"):
+                        commands += [QuitCommand()]
+
+                    if command in ("q!", "quit!"):
+                        commands += [QuitCommand(forced=True)]
+
+                    # whatever is left after anything after w is stripped
+                    possible_path = command[len(command_parts[0]) :].strip()
+
+                    if command_parts[0] in ("w", "write"):
+                        commands += [SaveCommand(path=possible_path)]
+
+                    if command_parts[0] in ("w!", "write!"):
+                        commands += [SaveCommand(forced=True, path=possible_path)]
+
+                    if command_parts[0] == "wq":
+                        commands += [SaveCommand(path=possible_path), QuitCommand()]
+
+                    if command_parts[0] == "wq!":
+                        commands += [
+                            SaveCommand(forced=True, path=possible_path),
+                            QuitCommand(),
+                        ]
 
             return commands
 
