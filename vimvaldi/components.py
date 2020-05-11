@@ -2,28 +2,26 @@
 
 from __future__ import annotations
 
-from typing import *
-from dataclasses import dataclass
-
-from abc import ABC, abstractmethod
-from enum import Enum, auto
-
 import curses
-from vimvaldi.commands import *
-import abjad
-import sys
+import logging # DEBUG; TO BE REMOVED
 import os
-
-# catch SIGINT and prevent it from terminating the app (the app will handle it properly)
+import sys
+from abc import ABC, abstractmethod
+from enum import auto
+from typing import *
 from signal import signal, SIGINT
 
-signal(SIGINT, lambda _, __: None)
 
-# DEBUG; TO BE REMOVED
-import logging
+import abjad
 
+from vimvaldi.commands import *
+
+# TODO remove -- just for debug
 logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
 print = logging.info
+
+# catch SIGINT and prevent it from terminating the script
+signal(SIGINT, lambda _, __: None)
 
 
 class Changeable:
@@ -49,7 +47,7 @@ class Component(ABC, Changeable):
         pass
 
     @abstractmethod
-    def handle_command(self, Command) -> List[Command]:
+    def handle_command(self, command) -> List[Command]:
         """Handles the given command. Returns the resulting command."""
         pass
 
@@ -105,9 +103,11 @@ class Menu(Component):
             ),
         ]
 
-    def handle_command(self, Command) -> List[Command]:
-        """If quit command is received, return a PopComponentCommand."""
-        return [PopComponentCommand()]
+    def handle_command(self, command) -> List[Command]:
+        """React to Quit command by quitting."""
+        if isinstance(command, QuitCommand):
+            return [PopComponentCommand()]
+        return []
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
@@ -143,9 +143,11 @@ class LogoDisplay(Component):
 
         return []
 
-    def handle_command(self, Command) -> List[Command]:
-        """If quit command is received, return a PopComponentCommand."""
-        return [PopComponentCommand()]
+    def handle_command(self, command) -> List[Command]:
+        """React to Quit command by quitting."""
+        if isinstance(command, QuitCommand):
+            return [PopComponentCommand()]
+        return []
 
 
 class TextDisplay(Component):
@@ -157,9 +159,11 @@ class TextDisplay(Component):
         # the current offset of the text display (by lines)
         self.line_offset = 0
 
-    def handle_command(self, Command) -> List[Command]:
-        """If quit command is received, return a PopComponentCommand."""
-        return [PopComponentCommand()]
+    def handle_command(self, command) -> List[Command]:
+        """React to Quit command by quitting."""
+        if isinstance(command, QuitCommand):
+            return [PopComponentCommand()]
+        return []
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
@@ -432,11 +436,11 @@ class Editor(Component):
                         )
                     ]
                 else:
+                    path = self.save_file
+
                     file_status = self.__does_file_exist(path)
                     if len(file_status) != 0 and not command.forced:
                         return file_status
-
-                    path = self.save_file
             else:
                 file_status = self.__does_file_exist(path)
                 if len(file_status) != 0 and not command.forced:

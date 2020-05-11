@@ -1,7 +1,7 @@
 """A set of utility functions used throughout the project."""
 
-from typing import *
 import curses
+from typing import *
 
 
 def center_coordinate(a: int, b: int) -> int:
@@ -20,7 +20,7 @@ def pop_number(string: str) -> Tuple[int, str]:
     return number, string
 
 
-def pop_char(string: str) -> Tuple[int, str]:
+def pop_char(string: str) -> Tuple[str, str]:
     """Pops a number from the beginning of the string."""
     if len(string) == 0:
         return "", ""

@@ -1,24 +1,9 @@
 """The initial module that gets called when the program is launched."""
 
-
-from typing import *
-from dataclasses import dataclass
 import argparse
 
-from abc import ABC, abstractmethod
-
-import sys
-import re
-
-import curses
-from vimvaldi.utilities import *
 from vimvaldi.components import *
-
-# DEBUG; TO BE REMOVED
-import logging
-
-logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
-print = logging.info
+from vimvaldi.utilities import *
 
 
 @dataclass
@@ -195,7 +180,7 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         width, height = self.__get_content_space()
 
         # wrap the lines first (adding them to a list)
-        wrapped: List[Tuple[str, indent_level]] = []
+        wrapped: List[Tuple[str, int]] = []
         for line in self.text.splitlines():
             if line == "":
                 wrapped.append(("", 0))

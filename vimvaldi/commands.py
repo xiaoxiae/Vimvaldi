@@ -1,5 +1,6 @@
 """A module for working with command."""
 from dataclasses import dataclass
+from enum import Enum
 
 
 @dataclass
@@ -54,12 +55,12 @@ class StatusLineCommand(Command):
 class SetStatusLineTextCommand(StatusLineCommand):
     """Set the status line to the given text."""
     text: str
-    position: int
+    position: Enum
 
 @dataclass
 class SetStatusLineStateCommand(StatusLineCommand):
     """Set the status line state."""
-    state: int
+    state: Enum
 
 class ClearStatusLineCommand(StatusLineCommand):
     """Clears the contents of the status line."""
