@@ -94,6 +94,7 @@ class Menu(Component):
     def status_line_label_change(self) -> List[Command]:
         """Return the command necessary for the status line to change label."""
         return [
+            ClearStatusLineCommand(),
             SetStatusLineTextCommand(
                 self.get_selected().tooltip, StatusLine.position.CENTER
             )
