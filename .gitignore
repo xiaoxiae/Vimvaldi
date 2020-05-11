@@ -21,3 +21,6 @@ makefile
 
 # Virtual env
 .venv/
+
+# PyCharm
+.idea/
