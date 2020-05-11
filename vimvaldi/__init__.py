@@ -151,8 +151,10 @@ class DrawableMenu(Drawable, Menu):
             self.window.addstr(x_off, y_off + len(lines) + 2 + i, text)
 
     def set_focused(self, value: bool) -> List[Command]:
+        """If the focus switched to the menu, set the status line according to the
+        currently selected item."""
         Drawable.set_focused(self, value)
-        return self.status_line_label_change()
+        return [] if not value else self.status_line_label_change()
 
 
 class DrawableLogoDisplay(Drawable, LogoDisplay):
@@ -332,10 +334,6 @@ class DrawableStatusLine(Drawable, StatusLine):
             for i, offset in enumerate(offsets):
                 self.window.addstr(offset, 0, self.text[i])
 
-    def set_focused(self, value: bool) -> List[Command]:
-        Drawable.set_focused(self, value)
-        return [ClearStatusLineCommand()]
-
 
 class DrawableEditor(Drawable, Editor):
     def __init__(self, window, title: str):
@@ -373,7 +371,7 @@ class DrawableEditor(Drawable, Editor):
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
-        return self._get_file_name_command()
+        return [ClearStatusLineCommand()] + self.get_file_name_commands()
 
 
 class Interface:
@@ -420,21 +418,31 @@ class Interface:
                 "|_|  |_|\___|_| |_|\__,_|",
                 [
                     MenuItem(
-                        "EDIT", PushComponentCommand("editor"), "Creates a new score."
+                        "EDIT", [PushComponentCommand("editor")], "Creates a new score."
+                    ),
+                    MenuItem(
+                        "OPEN",
+                        [
+                            ToggleFocusCommand(),
+                            SetStatusLineTextCommand("open ", StatusLine.position.LEFT),
+                        ],
+                        "Opens an existing score.",
                     ),
                     None,
                     MenuItem(
                         "HELP",
-                        PushComponentCommand("help"),
+                        [PushComponentCommand("help")],
                         "Displays program documentation.",
                     ),
                     MenuItem(
                         "INFO",
-                        PushComponentCommand("info"),
+                        [PushComponentCommand("info")],
                         "Shows information about the program.",
                     ),
                     None,
-                    MenuItem("QUIT", PopComponentCommand(), "Terminates the program."),
+                    MenuItem(
+                        "QUIT", [PopComponentCommand()], "Terminates the program."
+                    ),
                 ],
             ),
             "info": DrawableTextDisplay(
@@ -478,10 +486,10 @@ class Interface:
         # run the program (permanent loop)
         self.loop()
 
-    def get_focused(self):
-        """Get the focused component."""
-        return (
-            self.status_line
+        def get_focused(self):
+            """Get the focused component."""
+            return (
+                self.status_line
             if self.status_line.is_focused()
             else self.component_stack[-1]
         )
@@ -525,6 +533,9 @@ class Interface:
 
     def resolve_commands(self, commands: List[Command]):
         """Resolve the specified commands."""
+        # this is important, since it creates a new list so we can modify it freely
+        commands = list(commands)
+
         while len(commands) != 0:
             command = commands.pop(0)
 

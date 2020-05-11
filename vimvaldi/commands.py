@@ -14,16 +14,24 @@ class GeneralCommand(Command):
 class ToggleFocusCommand(GeneralCommand):
     """A command to toggle focus from the status line to the main window."""
 
+
+
+class IOCommand(Command):
+    """Things related to file IO."""
+
 @dataclass
-class QuitCommand(GeneralCommand):
-    """A command to quit. A nicer version of terminate."""
+class QuitCommand(IOCommand):
     forced: bool = False  # q!
 
 @dataclass
-class SaveCommand(GeneralCommand):
-    """A command to save."""
+class SaveCommand(IOCommand):
     path: str = None
     forced: bool = False  # w!
+
+@dataclass
+class OpenCommand(IOCommand):
+    path: str = None
+
 
 
 class ComponentCommand(Command):
@@ -60,7 +68,6 @@ class ClearStatusLineCommand(StatusLineCommand):
 
 class EditorCommand(Command):
     """Commands that concern the note editor."""
-
 
 @dataclass
 class InsertCommand(EditorCommand):

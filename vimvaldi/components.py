@@ -54,7 +54,7 @@ class MenuItem:
     """A class for representing an item of a menu."""
 
     label: str
-    action: Command
+    commands: List[Command]
     tooltip: str
 
 
@@ -114,7 +114,7 @@ class Menu(Component):
             return self.status_line_label_change()
 
         elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
-            return [self.get_selected().action]
+            return self.get_selected().commands
 
         elif key == (":"):
             return [
@@ -193,9 +193,14 @@ class StatusLine(Component):
         self.cursor_offset = 0
 
     def set_text(self, position: StatusLine.position, text: str):
-        """Change text at the specified position (left/center/right)."""
+        """Change text at the specified position (left/center/right). Also, if the
+        position is left, move the cursor to the very end (done when adding a partial
+        command, for example)."""
         self.text[position.value] = text
         self.set_changed(True)
+
+        if position == StatusLine.position.LEFT:
+            self.cursor_offset = len(self.text[position.value])
 
     def clear_text(self, position: StatusLine.position):
         self.text[position.value] = ""
@@ -314,6 +319,9 @@ class StatusLine(Component):
                     if command_parts[0] in ("w!", "write!"):
                         commands += [SaveCommand(forced=True, path=possible_path)]
 
+                    if command_parts[0] in ("o", "open"):
+                        commands += [OpenCommand(path=possible_path)]
+
                     if command_parts[0] == "wq":
                         commands += [SaveCommand(path=possible_path), QuitCommand()]
 
@@ -430,7 +438,7 @@ class Editor(Component):
                     return file_status
 
                 self.save_file = path
-                commands += self._get_file_name_command()
+                commands += self.get_file_name_commands()
 
             try:
                 with open(self.save_file, "w") as f:
@@ -472,7 +480,7 @@ class Editor(Component):
 
         return []
 
-    def _get_file_name_command(self) -> List[Command]:
+    def get_file_name_commands(self) -> List[Command]:
         """Return the appropriate command for changing the label of the status line."""
         if self.save_file is None:
             return [SetStatusLineTextCommand("[no file]", StatusLine.position.RIGHT,)]
