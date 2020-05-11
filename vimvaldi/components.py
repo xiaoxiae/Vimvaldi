@@ -97,12 +97,12 @@ class Menu(Component):
             ClearStatusLineCommand(),
             SetStatusLineTextCommand(
                 self.get_selected().tooltip, StatusLine.position.CENTER
-            )
+            ),
         ]
 
     def handle_command(self, Command) -> List[Command]:
-        """Don't handle any commands."""
-        return []
+        """If quit command is received, return a PopComponentCommand."""
+        return [PopComponentCommand()]
 
     def handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
@@ -139,8 +139,8 @@ class LogoDisplay(Component):
         return []
 
     def handle_command(self, Command) -> List[Command]:
-        """Don't handle any commands."""
-        return []
+        """If quit command is received, return a PopComponentCommand."""
+        return [PopComponentCommand()]
 
 
 class TextDisplay(Component):

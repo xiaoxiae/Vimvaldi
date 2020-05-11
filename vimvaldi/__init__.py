@@ -351,7 +351,7 @@ class DrawableEditor(Drawable, Editor):
         width = self.window.width()
         height = self.window.height()
 
-        title_sheet_spacing = 3
+        title_sheet_spacing = 3  # distance from the notesheet to the window title
 
         # center the logo and the sheet horizontally
         center = center_coordinate(
@@ -494,39 +494,7 @@ class Interface:
                 self.resize_windows()
             else:
                 # send the key to the currently focused component
-                commands = self.get_focused().handle_keypress(k)
-
-                while len(commands) != 0:
-                    command = commands.pop(0)
-
-                    # pop the component, possibly terminating the app
-                    if isinstance(command, PopComponentCommand):
-                        self.component_stack.pop()
-
-                        # if there are no remaining components, return
-                        if len(self.component_stack) == 0:
-                            return
-
-                        commands += self.component_stack[-1].set_focused(True)
-
-                    # add a new component, setting the focus on it
-                    elif isinstance(command, PushComponentCommand):
-                        self.component_stack.append(self.components[command.component])
-                        commands += self.status_line.set_focused(False)
-                        commands += self.component_stack[-1].set_focused(True)
-
-                    # toggle focus
-                    elif isinstance(command, ToggleFocusCommand):
-                        commands += self.status_line.toggle_focused()
-                        commands += self.component_stack[-1].toggle_focused()
-
-                    # status line things
-                    elif isinstance(command, StatusLineCommand):
-                        commands += self.status_line.handle_command(command)
-
-                    # else just let the active component handle it
-                    else:
-                        commands += self.component_stack[-1].handle_command(command)
+                self.resolve_commands(self.get_focused().handle_keypress(k))
 
             # redraw the component and the status line
             # check for errors when drawing, possibly displaying an error message
@@ -547,7 +515,46 @@ class Interface:
                 )
 
             # wait for the next character
-            k = self.window.get_wch()
+            # done to handle ^C gracefully, since curses sends an error
+            try:
+                k = self.window.get_wch()
+            except curses.error as e:
+                self.resolve_commands([QuitCommand()])
+                k = None
+
+    def resolve_commands(self, commands: List[Command]):
+        """Resolve the specified commands."""
+        while len(commands) != 0:
+            command = commands.pop(0)
+
+            # pop the component, possibly terminating the app
+            if isinstance(command, PopComponentCommand):
+                self.component_stack.pop()
+
+                # if there are no remaining components, return
+                if len(self.component_stack) == 0:
+                    quit()
+
+                commands += self.component_stack[-1].set_focused(True)
+
+            # add a new component, setting the focus on it
+            elif isinstance(command, PushComponentCommand):
+                self.component_stack.append(self.components[command.component])
+                commands += self.status_line.set_focused(False)
+                commands += self.component_stack[-1].set_focused(True)
+
+            # toggle focus
+            elif isinstance(command, ToggleFocusCommand):
+                commands += self.status_line.toggle_focused()
+                commands += self.component_stack[-1].toggle_focused()
+
+            # status line things
+            elif isinstance(command, StatusLineCommand):
+                commands += self.status_line.handle_command(command)
+
+            # else just let the active component handle it
+            else:
+                commands += self.component_stack[-1].handle_command(command)
 
     def initialize_colors(self):
         """Initializes the colors used throughout the program."""
