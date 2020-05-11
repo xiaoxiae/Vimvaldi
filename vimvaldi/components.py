@@ -14,6 +14,11 @@ import abjad
 import sys
 import os
 
+# catch SIGINT and prevent it from terminating the app (the app will handle it properly)
+from signal import signal, SIGINT
+
+signal(SIGINT, lambda _, __: None)
+
 # DEBUG; TO BE REMOVED
 import logging
 
