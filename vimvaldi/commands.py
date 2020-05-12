@@ -1,4 +1,5 @@
 """A module for working with command."""
+
 from dataclasses import dataclass
 
 from vimvaldi.utilities import *

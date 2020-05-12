@@ -346,7 +346,7 @@ class DrawableEditor(Drawable, Editor):
         # draw the title of the menu
         for i, line in enumerate(self.title.splitlines()):
             x_off = center_coordinate(width, len(line))
-            self.window.addstr(x_off, center + i + title_sheet_spacing, line)
+            self.window.addstr(x_off, center + i, line)
 
         # draw the sheet lines
         for x in range(self.side_offsets[0], width - self.side_offsets[0]):
@@ -438,7 +438,7 @@ class Interface:
         """The main loop of the program."""
         # is set when the terminal is too small to draw the currently active component
         # done so all input to the active component (keystrokes) is disabled
-        terminal_too_small = False  
+        terminal_too_small = False
 
         k = None
         while True:
