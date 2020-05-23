@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from vimvaldi.utilities import *
 
 
+
 @dataclass
 class Command:
     """The default command class that is inherited by all other command classes."""

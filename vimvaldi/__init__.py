@@ -8,26 +8,31 @@ from vimvaldi.graphics import *
 
 
 @dataclass
-class View:
+class Rectangle:
+    """A rectangle class."""
+
     x: int
     y: int
     width: int
     height: int
+
+    def contains(self, x: int, y: int):
+        """Whether the rectangle contains the given point."""
+        return 0 <= x <= self.width and 0 <= y <= self.height
 
 
 class WindowView:
     """A Curses window wrapper to only paint on a part of it because either I'm stupid
     or Curses is a broken mess and Windows don't work as they should."""
 
-    def __init__(self, parent, view: View = View(-1, -1, -1, -1)):
+    def __init__(self, parent, view: Rectangle = Rectangle(-1, -1, -1, -1)):
         # the parent window
         self.parent = parent
 
         # the restricted view of the parent window
-        # it's x, y, width, height
         self.view = view
 
-    def resize(self, view: View):
+    def resize(self, view: Rectangle):
         """Resize view to the given size."""
         self.view = view
 
@@ -40,17 +45,30 @@ class WindowView:
         return self.view.height
 
     def clear(self, *args, **kwargs):
+        """Overridden window.clear()."""
         # TODO delete only the rectangle -- this deletes whole lines
         for y in range(self.view.height):
             self.parent.move(y + self.view.y, 0)
             self.parent.clrtoeol()
 
     def addstr(self, x: int, y: int, string: str, *args, **kwargs):
-        # TODO check bounds
+        """Overridden window.addstr()."""
+        if not self.view.contains(x, y) or not self.view.contains(x + len(string), y):
+            WindowView.__raise_out_of_bounds_exception()
+
         self.parent.addstr(y + self.view.y, x + self.view.x, string, *args, **kwargs)
 
     def move(self, x: int, y: int):
+        """Overridden window.move()."""
+        if not self.view.contains(x, y):
+            WindowView.__raise_out_of_bounds_exception()
+
         self.parent.move(y + self.view.y, x + self.view.x)
+
+    @classmethod
+    def __raise_out_of_bounds_exception(cls) -> ValueError:
+        """Raise an exception that something reached outside the window."""
+        raise ValueError("Action out of the window bounds.")
 
 
 class Drawable(ABC, Changeable):
@@ -82,7 +100,6 @@ class Drawable(ABC, Changeable):
     def _draw(self):
         """The internal implementation that draws on the actual window and has to be
         implemented by classes that inherit this class."""
-        pass
 
     def draw(self):
         """The function that draws the Drawable (if anything changed). Checks, whether
@@ -102,6 +119,8 @@ class Drawable(ABC, Changeable):
 
 
 class DrawableMenu(Drawable, Menu):
+    """A menu that can be drawn on the window."""
+
     def __init__(self, window, title: str, items: Sequence[Optional[MenuItem]]):
         Drawable.__init__(self, window)
         Menu.__init__(self, items)
@@ -144,6 +163,8 @@ class DrawableMenu(Drawable, Menu):
 
 
 class DrawableLogoDisplay(Drawable, LogoDisplay):
+    """A logo display that can be drawn on the window."""
+
     def __init__(self, window, text: str):
         Drawable.__init__(self, window)
         LogoDisplay.__init__(self, text)
@@ -163,6 +184,8 @@ class DrawableLogoDisplay(Drawable, LogoDisplay):
 
 
 class DrawableTextDisplay(Drawable, TextDisplay):
+    """A text display that can be drawn on the window."""
+
     def __init__(self, window, text: str):
         Drawable.__init__(self, window)
         TextDisplay.__init__(self, text)
@@ -267,32 +290,31 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         Drawable.set_focused(self, value)
         return [ClearStatusLineCommand()]
 
-    def handle_keypress(self, key: str) -> Command:
+    def _handle_keypress(self, key: str) -> Command:
         """Expanded because TextDisplay couldn't easily implement ^D and ^U, since it
         doesn't know the current zoom level."""
         # call super for the command
-        command = TextDisplay.handle_keypress(self, key)
+        command = TextDisplay._handle_keypress(self, key)
 
         # if a command was generated, propagate
         if len(command) != 0:
             return command
 
         # else check for ^D and ^U
-        else:
-            height = self.__get_content_space()[1]
+        height = self.__get_content_space()[1]
 
-            if key == chr(4):  # ^D
-                self.line_offset += height // 3
-                self.set_changed(True)
+        if key == chr(4):  # ^D
+            self.line_offset += height // 3
+            self.set_changed(True)
 
-            if key == chr(21):  # ^U
-                self.line_offset -= height // 3
-                self.set_changed(True)
-
-        return []
+        if key == chr(21):  # ^U
+            self.line_offset -= height // 3
+            self.set_changed(True)
 
 
 class DrawableStatusLine(Drawable, StatusLine):
+    """A status line that can be drawn on the window."""
+
     def __init__(self, window):
         Drawable.__init__(self, window)
         StatusLine.__init__(self)
@@ -307,7 +329,6 @@ class DrawableStatusLine(Drawable, StatusLine):
 
         if self.is_focused():
             command_text = self.text[0]
-            cursor_offset = self.cursor_offset
 
             if self.current_state is State.NORMAL:
                 command_text = ":" + command_text
@@ -322,6 +343,8 @@ class DrawableStatusLine(Drawable, StatusLine):
 
 
 class DrawableEditor(Drawable, Editor):
+    """A note sheet editor that can be drawn on the window."""
+
     def __init__(self, window, title: str):
         Drawable.__init__(self, window)
         Editor.__init__(self)
@@ -371,8 +394,7 @@ class Interface:
         self.main_window = WindowView(window)
         self.status_window = WindowView(window)
 
-        # initialize the terminal colors
-        self.initialize_colors()
+        Interface.__initialize_colors()
 
         # component initialization
         self.status_line = DrawableStatusLine(self.status_window)
@@ -492,7 +514,7 @@ class Interface:
 
                 # if there are no remaining components, return
                 if len(self.component_stack) == 0:
-                    quit()
+                    sys.exit()
 
                 commands += self.component_stack[-1].set_focused(True)
 
@@ -515,7 +537,8 @@ class Interface:
             else:
                 commands += self.component_stack[-1].handle_command(command)
 
-    def initialize_colors(self):
+    @classmethod
+    def __initialize_colors(cls):
         """Initializes the colors used throughout the program."""
         curses.start_color()
         curses.use_default_colors()
@@ -527,8 +550,8 @@ class Interface:
         """Resize the windows of the interface."""
         height, width = self.window.getmaxyx()
 
-        self.main_window.resize(View(0, 0, width, height - 1))
-        self.status_window.resize(View(0, height - 1, width, 1))
+        self.main_window.resize(Rectangle(0, 0, width, height - 1))
+        self.status_window.resize(Rectangle(0, height - 1, width, 1))
 
         self.status_line.set_changed(True)
         self.component_stack[-1].set_changed(True)

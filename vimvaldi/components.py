@@ -40,15 +40,23 @@ class Changeable:
 class Component(ABC, Changeable):
     """A class that is inherited by all of the components."""
 
-    @abstractmethod
     def handle_keypress(self, key: str) -> List[Command]:
-        """Handles a single keypress. Returns the resulting command."""
-        pass
+        """Handles a single keypress. Returns the resulting commands. Internally calls
+        _handle_keypress that the classes define."""
+        return self._handle_keypress(key) or []
 
     @abstractmethod
-    def handle_command(self, command) -> List[Command]:
-        """Handles the given command. Returns the resulting command."""
-        pass
+    def _handle_keypress(self, key: str):
+        """Main logic of handle_keypress function."""
+
+    def handle_command(self, command: Command) -> List[Command]:
+        """Handles the given command. Returns the resulting commands. Internally calls
+        _handle_command that the classes define."""
+        return self._handle_command(command) or []
+
+    @abstractmethod
+    def _handle_command(self, command: Command):
+        """Main logic of handle_command function."""
 
 
 @dataclass
@@ -100,31 +108,28 @@ class Menu(Component):
             SetStatusLineTextCommand(self.get_selected().tooltip, Position.CENTER),
         ]
 
-    def handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command) -> List[Command]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
-        return []
 
-    def handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> List[Command]:
         if key == "j":
             self.next()
             return self.update_status_line()
 
-        elif key == "k":
+        if key == "k":
             self.previous()
             return self.update_status_line()
 
-        elif key in (curses.KEY_ENTER, "\n", "\r", "l"):
+        if key in (curses.KEY_ENTER, "\n", "\r", "l"):
             return self.get_selected().commands
 
-        elif key == ":":
+        if key == ":":
             return [
                 ToggleFocusCommand(),
                 SetStatusLineStateCommand(State.NORMAL),
             ]
-
-        return []
 
 
 class LogoDisplay(Component):
@@ -133,18 +138,15 @@ class LogoDisplay(Component):
     def __init__(self, text: str):
         self.text = text
 
-    def handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> List[Command]:
         """Go away from the logo when enter is pressed."""
         if key in (curses.KEY_ENTER, "\n", "\r"):
             return [PopComponentCommand()]
 
-        return []
-
-    def handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command) -> List[Command]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
-        return []
 
 
 class TextDisplay(Component):
@@ -156,13 +158,12 @@ class TextDisplay(Component):
         # the current offset of the text display (by lines)
         self.line_offset = 0
 
-    def handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command) -> List[Command]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
-        return []
 
-    def handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> List[Command]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
             self.set_changed(True)
@@ -173,8 +174,6 @@ class TextDisplay(Component):
 
         elif key == "q":
             return [PopComponentCommand()]
-
-        return []
 
 
 class StatusLine(Component):
@@ -200,6 +199,7 @@ class StatusLine(Component):
             self.cursor_offset = len(self.text[position.value])
 
     def clear_text(self, position: Position):
+        """Clear the given status line position."""
         self.text[position.value] = ""
 
         # also reset the cursor if the left position is changed
@@ -213,7 +213,7 @@ class StatusLine(Component):
         for pos in Position:
             self.clear_text(pos)
 
-    def handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command) -> List[Command]:
         if isinstance(command, SetStatusLineTextCommand):
             self.set_text(command.position, command.text)
         elif isinstance(command, ClearStatusLineCommand):
@@ -221,9 +221,7 @@ class StatusLine(Component):
         elif isinstance(command, SetStatusLineStateCommand):
             self.current_state = command.state
 
-        return []
-
-    def handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> List[Command]:
         self.set_changed(True)
 
         # to simplify the code
@@ -247,7 +245,7 @@ class StatusLine(Component):
             self.text[0] = self.text[0][:pos] + self.text[0][pos + 1 :]
 
         # escape: clear and transfer focus
-        elif type(key) is str and ord(key) == 27:  # esc
+        elif isinstance(key, str) and ord(key) == 27:  # esc
             self.clear()
             return [ToggleFocusCommand()]
 
@@ -295,12 +293,11 @@ class StatusLine(Component):
                 command = text.strip()
                 command_parts = command.split()
 
-                edit_commands = []
-
                 # help and info screens from anywhere
                 if command in ("help", "info"):
                     commands.append(PushComponentCommand(command))
 
+                # TODO: rewrite this?
                 if len(command_parts) != 0:
                     if command in ("q", "quit"):
                         commands += [QuitCommand()]
@@ -339,8 +336,6 @@ class StatusLine(Component):
             self.text[0] = self.text[0][:pos] + str(key) + self.text[0][pos:]
             self.cursor_offset += len(str(key))
 
-        return []
-
 
 class Editor(Component):
     """A class for working with the notesheet."""
@@ -362,19 +357,18 @@ class Editor(Component):
         """Return the abjad container that stores the notes."""
         return self.score
 
-    def handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> List[Command]:
         if key == ":":
             return [
                 ToggleFocusCommand(),
                 SetStatusLineStateCommand(State.NORMAL),
             ]
-        elif key == "i":
+
+        if key == "i":
             return [
                 ToggleFocusCommand(),
                 SetStatusLineStateCommand(State.INSERT),
             ]
-
-        return []
 
     def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
@@ -386,7 +380,7 @@ class Editor(Component):
             else []
         )
 
-    def handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command) -> List[Command]:
         if isinstance(command, InsertCommand):
             return self.__handle_insert_command(command)
 
@@ -399,15 +393,13 @@ class Editor(Component):
         elif isinstance(command, OpenCommand):
             return self.__handle_open_command(command)
 
-        return []
-
     def __handle_insert_command(self, command: InsertCommand) -> List[Command]:
         """Attempt to parse whatever the InsertCommand contains. Return either [] if
         successful or a command that sets the status line text to what happened."""
         text = command.text
 
         if len(text) == 0:
-            return []
+            return
 
         try:
             if text[0] == "r":
@@ -427,8 +419,6 @@ class Editor(Component):
                     "The string could not be parsed.", Position.CENTER
                 )
             ]
-
-        return []
 
     def __handle_save_command(self, command: SaveCommand) -> List[Command]:
         path = command.path  # the path to save file to
