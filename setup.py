@@ -22,7 +22,7 @@ setup(
 
     # where to look for files
     packages=["vimvaldi"],
-    data_files=[("", ["LICENSE.txt", "README.md"])],
+    data_files=[("", ["LICENSE.txt", "README.md", "DOCUMENTATION.md"])],
 
     entry_points={'console_scripts': ['vimvaldi=vimvaldi.__init__:run']},
 
