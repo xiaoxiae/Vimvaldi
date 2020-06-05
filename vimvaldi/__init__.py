@@ -353,7 +353,7 @@ class DrawableEditor(Drawable, Editor):
         self.title = title
 
         # drawing offsets
-        self.left_offset = 9 # larger than right (clef, time signature)
+        self.left_offset = 15  # larger than right (clef, time signature)
         self.right_offset = 5
 
     def _draw(self):
@@ -375,20 +375,24 @@ class DrawableEditor(Drawable, Editor):
             self.window.addstr(x_off, center + i, line)
 
         # the offset to the first line of the note sheet
-        y_offset_to_notes = center + len(self.title.splitlines()) + title_sheet_spacing
+        y_offset = center + len(self.title.splitlines()) + title_sheet_spacing
 
         # draw the sheet lines
         for x in range(self.left_offset, width - self.right_offset):
             for y in range(sheet_lines):
-                y += y_offset_to_notes
+                y += y_offset
                 self.window.addstr(x, y, " ", curses.A_UNDERLINE)
 
         # time signature
-        self.window.addstr(self.right_offset, y_offset_to_notes + 1, str(self.time.numerator), curses.A_UNDERLINE)
-        self.window.addstr(self.right_offset, y_offset_to_notes + 2, str(self.time.denominator))
+        time = f"{self.time.numerator}/{self.time.denominator}"
+        self.window.addstr(self.right_offset, y_offset + 1, time)
 
         # clef
-        self.window.addstr(self.right_offset, y_offset_to_notes + 4, getattr(Notation.Clef, self.clef.name.upper()))
+        clef = getattr(Notation.Clef, self.clef.name.upper())
+        self.window.addstr(self.right_offset + 6, y_offset + 1, clef)
+
+        # key
+        self.window.addstr(self.right_offset, y_offset + 4, self.key.name)
 
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
