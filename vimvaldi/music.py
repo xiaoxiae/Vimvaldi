@@ -24,10 +24,6 @@ class Notation:
     class Time:
         COMMON = "𝄴"
 
-        @classmethod
-        def from_fraction(cls, num: int, den: int) -> str:
-            return f"{num}/{den}"
-
     class Note:
         WHOLE = "𝅝"
         HALF = "𝅗𝅥"
@@ -45,3 +41,14 @@ class Notation:
         SIXTEENTH = "𝄿"
         THIRTY_SECOND = "𝅀"
         SIXTY_FOURTH = "𝅁"
+
+    class Bar:
+        SINGLE = "𝄀"
+        DOUBLE = "𝄁"
+        FINAL = "𝄂"
+
+    class Coda:
+        LEFT_REPEAT = "𝄆"
+        RIGHT_REPEAT = "𝄇"
+        DA_CAPO = "𝄊"
+        CODA = "𝄌"
