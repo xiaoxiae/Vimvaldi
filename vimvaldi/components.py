@@ -124,6 +124,9 @@ class Menu(Component):
             self.previous()
             return self.update_status_line()
 
+        if key == "q":
+            return [QuitCommand()]
+
         if key == chr(4):  # ^D
             self.__move_index(3)
             return self.update_status_line()
