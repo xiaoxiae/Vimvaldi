@@ -46,7 +46,7 @@ class Component(ABC, Changeable):
         return self._handle_keypress(key) or []
 
     @abstractmethod
-    def _handle_keypress(self, key: str):
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         """Main logic of handle_keypress function."""
 
     def handle_command(self, command: Command) -> List[Command]:
@@ -55,7 +55,7 @@ class Component(ABC, Changeable):
         return self._handle_command(command) or []
 
     @abstractmethod
-    def _handle_command(self, command: Command):
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """Main logic of handle_command function."""
 
 
@@ -108,12 +108,12 @@ class Menu(Component):
             SetStatusLineTextCommand(self.get_selected().tooltip, Position.CENTER),
         ]
 
-    def _handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
 
-    def _handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         if key == "j":
             self.next()
             return self.update_status_line()
@@ -138,12 +138,12 @@ class LogoDisplay(Component):
     def __init__(self, text: str):
         self.text = text
 
-    def _handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         """Go away from the logo when enter is pressed."""
         if key in (curses.KEY_ENTER, "\n", "\r"):
             return [PopComponentCommand()]
 
-    def _handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
@@ -158,12 +158,12 @@ class TextDisplay(Component):
         # the current offset of the text display (by lines)
         self.line_offset = 0
 
-    def _handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
 
-    def _handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
             self.set_changed(True)
@@ -213,7 +213,7 @@ class StatusLine(Component):
         for pos in Position:
             self.clear_text(pos)
 
-    def _handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         if isinstance(command, SetStatusLineTextCommand):
             self.set_text(command.position, command.text)
         elif isinstance(command, ClearStatusLineCommand):
@@ -221,7 +221,7 @@ class StatusLine(Component):
         elif isinstance(command, SetStatusLineStateCommand):
             self.current_state = command.state
 
-    def _handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         self.set_changed(True)
 
         # to simplify the code
@@ -357,7 +357,7 @@ class Editor(Component):
         """Return the abjad container that stores the notes."""
         return self.score
 
-    def _handle_keypress(self, key: str) -> List[Command]:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         if key == ":":
             return [
                 ToggleFocusCommand(),
@@ -380,7 +380,7 @@ class Editor(Component):
             else []
         )
 
-    def _handle_command(self, command) -> List[Command]:
+    def _handle_command(self, command: Command) -> Optional[List[Command]]:
         if isinstance(command, InsertCommand):
             return self.__handle_insert_command(command)
 

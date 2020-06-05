@@ -290,14 +290,14 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         Drawable.set_focused(self, value)
         return [ClearStatusLineCommand()]
 
-    def _handle_keypress(self, key: str) -> Command:
+    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
         """Expanded because TextDisplay couldn't easily implement ^D and ^U, since it
         doesn't know the current zoom level."""
         # call super for the command
         command = TextDisplay._handle_keypress(self, key)
 
         # if a command was generated, propagate
-        if len(command) != 0:
+        if command is not None and len(command) != 0:
             return command
 
         # else check for ^D and ^U
