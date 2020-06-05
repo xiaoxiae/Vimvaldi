@@ -77,11 +77,13 @@ class Menu(Component):
 
     def __move_index(self, delta):
         """Moves the index of the menu by delta positions (ignoring Nulls)."""
-        self.index = (self.index + delta) % len(self.items)
+        self.index = min(max((self.index + delta), 0), len(self.items) - 1)
 
         # skip the spacers
         while self.items[self.index] is None:
-            self.index = (self.index + (1 if delta > 0 else -1)) % len(self.items)
+            self.index = min(
+                max((self.index + (1 if delta > 0 else -1)), 0), len(self.items) - 1
+            )
 
         self.set_changed(True)
 
@@ -120,6 +122,14 @@ class Menu(Component):
 
         if key == "k":
             self.previous()
+            return self.update_status_line()
+
+        if key == chr(4):  # ^D
+            self.__move_index(3)
+            return self.update_status_line()
+
+        if key == chr(21):  # ^U
+            self.__move_index(-3)
             return self.update_status_line()
 
         if key in (curses.KEY_ENTER, "\n", "\r", "l"):
