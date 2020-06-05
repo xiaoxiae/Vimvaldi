@@ -5,6 +5,7 @@ import argparse
 from vimvaldi.components import *
 from vimvaldi.utilities import *
 from vimvaldi.graphics import *
+from vimvaldi.music import *
 
 
 @dataclass
@@ -351,7 +352,9 @@ class DrawableEditor(Drawable, Editor):
 
         self.title = title
 
-        self.side_offsets = [5, 1]  # left/right offset, top/bottom offset
+        # drawing offsets
+        self.left_offset = 9 # larger than right (clef, time signature)
+        self.right_offset = 5
 
     def _draw(self):
         sheet_lines = 5  # number of lines in a note sheet
@@ -371,11 +374,21 @@ class DrawableEditor(Drawable, Editor):
             x_off = center_coordinate(width, len(line))
             self.window.addstr(x_off, center + i, line)
 
+        # the offset to the first line of the note sheet
+        y_offset_to_notes = center + len(self.title.splitlines()) + title_sheet_spacing
+
         # draw the sheet lines
-        for x in range(self.side_offsets[0], width - self.side_offsets[0]):
+        for x in range(self.left_offset, width - self.right_offset):
             for y in range(sheet_lines):
-                y += center + len(self.title.splitlines()) + title_sheet_spacing
+                y += y_offset_to_notes
                 self.window.addstr(x, y, " ", curses.A_UNDERLINE)
+
+        # time signature
+        self.window.addstr(self.right_offset, y_offset_to_notes + 1, str(self.time.numerator), curses.A_UNDERLINE)
+        self.window.addstr(self.right_offset, y_offset_to_notes + 2, str(self.time.denominator))
+
+        # clef
+        self.window.addstr(self.right_offset, y_offset_to_notes + 4, getattr(Notation.Clef, self.clef.name.upper()))
 
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
