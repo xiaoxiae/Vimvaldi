@@ -472,8 +472,13 @@ class Interface:
 
         # the stack of the currently active components
         # start with logo on top of menu
-        self.component_stack = [self.components["menu"], self.components["logo"]]
-        self.component_stack[-1].set_focused(True)
+        self.component_stack = (
+            [self.components["menu"], self.components["logo"]]
+            if not arguments.no_logo
+            else [self.components["menu"]]
+        )
+
+        self.resolve_commands(self.component_stack[-1].set_focused(True))
 
         self.resize_windows()
 
@@ -593,6 +598,14 @@ def run():
     """An entry point to the program."""
     parser = argparse.ArgumentParser(
         description="A terminal note sheet editor with Vim-like keybindings.",
+    )
+
+    parser.add_argument(
+        "-l",
+        "-no-logo",
+        dest="no_logo",
+        action="store_true",
+        help="Suppress showing the app logo on startup.",
     )
 
     curses.wrapper(Interface, parser.parse_args())
