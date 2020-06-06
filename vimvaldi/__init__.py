@@ -201,6 +201,8 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         )
 
     def _draw(self):
+        # TODO: maybe rewrite this? a little bit of a mess...
+
         # get the free space that we can draw on
         width, height = self.__get_content_space()
 
@@ -253,6 +255,19 @@ class DrawableTextDisplay(Drawable, TextDisplay):
         y = 0
         for line, h_level in wrapped[self.line_offset : height + self.line_offset]:
             x = 0
+
+            # special case for hbar
+            if line.rstrip() == "---":
+                hbar_offset = 3
+
+                self.window.addstr(
+                    self.side_offsets[0] + hbar_offset,
+                    self.side_offsets[1] + y,
+                    "─" * (width - hbar_offset * 2),
+                )
+
+                y += 1
+                continue
 
             j = 0
             while x + j < len(line):
