@@ -46,7 +46,7 @@ class Component(ABC, Changeable):
         return self._handle_keypress(key) or []
 
     @abstractmethod
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
         """Main logic of handle_keypress function."""
 
     def handle_command(self, command: Command) -> List[Command]:
@@ -148,7 +148,7 @@ class LogoDisplay(Component):
     def __init__(self, text: str):
         self.text = text
 
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
         """Go away from the logo when enter is pressed."""
         if key in (curses.KEY_ENTER, "\n", "\r"):
             return [PopComponentCommand()]
@@ -173,7 +173,7 @@ class TextDisplay(Component):
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
 
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
             self.line_offset += 1
             self.set_changed(True)
@@ -231,7 +231,7 @@ class StatusLine(Component):
         elif isinstance(command, SetStatusLineStateCommand):
             self.current_state = command.state
 
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
         self.set_changed(True)
 
         # to simplify the code
@@ -367,7 +367,7 @@ class Editor(Component):
         """Return the abjad container that stores the notes."""
         return self.score
 
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
         if key == ":":
             return [
                 ToggleFocusCommand(),

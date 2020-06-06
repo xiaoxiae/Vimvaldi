@@ -48,15 +48,31 @@ This is a toy project. Please, for the love of god, do not use this anywhere nea
 help_text = r"""# Help
 The following page contains instructions on using the app.
 
+## Controls
+
+### General
+_k_ or _↑_          | up
+_j_ or _↓_          | down
+_h_ or _←_          | left
+_l_ or _→_          | right
+_CTRL-D_ \/ _CTRL-U_ | up\/down (faster)
+_enter_           | confirm
+
+### Help\/Info
+_q_ | exit
+
+### Editor
+_TODO_
+
 ## Commands
+Commands can be issued from nearly anywhere within the app by pressing _:_ and typing the respective command.
 
 ### General
 _:help_ | display this page
 _:info_ | display the info page
 
-### I\/O
-Note that these commands can only be issued from the editor.
-_:q[!]_ or _:quit[!]_                | terminate the app [without saving]
+### Editor
+_:q[!]_ or _:quit[!]_                | quit [without saving]
 _:w[!] [path]_ or _:write[!] [path]_ | [forcibly] save [to the specified path]
 _:o[!] path_ or _:open[!] path_      | open file [discarding current]
 _:wq[!] [path]_                    | _:w_ and _:q[!]_ combined"""
