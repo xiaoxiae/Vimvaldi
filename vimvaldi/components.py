@@ -115,17 +115,14 @@ class Menu(Component):
         if isinstance(command, QuitCommand):
             return [PopComponentCommand()]
 
-    def _handle_keypress(self, key: str) -> Optional[List[Command]]:
-        if key == "j":
+    def _handle_keypress(self, key) -> Optional[List[Command]]:
+        if key in ("j", 258):
             self.next()
             return self.update_status_line()
 
-        if key == "k":
+        if key in ("k", 259):
             self.previous()
             return self.update_status_line()
-
-        if key == "q":
-            return [QuitCommand()]
 
         if key == chr(4):  # ^D
             self.__move_index(3)
@@ -135,7 +132,7 @@ class Menu(Component):
             self.__move_index(-3)
             return self.update_status_line()
 
-        if key in (curses.KEY_ENTER, "\n", "\r", "l"):
+        if key in (curses.KEY_ENTER, "\n", "\r"):
             return self.get_selected().commands
 
         if key == ":":

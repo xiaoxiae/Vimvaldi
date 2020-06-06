@@ -534,8 +534,8 @@ class Interface:
             try:
                 k = self.window.get_wch()
             except curses.error as e:
-                self.resolve_commands([QuitCommand()])
                 k = None
+                pass
 
     def resolve_commands(self, commands: List[Command]):
         """Resolve the specified commands."""
