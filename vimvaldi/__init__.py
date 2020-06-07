@@ -371,6 +371,9 @@ class DrawableEditor(Drawable, Editor):
         self.left_offset = 15  # larger than right (clef, time signature)
         self.right_offset = 5
 
+        # from which note/rest/... the drawing starts
+        self.position_offset = 0
+
     def _draw(self):
         sheet_lines = 5  # number of lines in a note sheet
 
@@ -409,10 +412,73 @@ class DrawableEditor(Drawable, Editor):
         # key
         self.window.addstr(self.right_offset, y_offset + 4, self.key.name)
 
+        # the starting measure (only if we're at the very beginning)
+        if self.position_offset == 0:
+            self.__draw_bar(self.left_offset + 1, y_offset + 1, Notation.Bar.DOUBLE)
+
+        # find the sum of durations of notes that aren't currently displayed
+        duration = abjad.Duration()
+        for item in self.score[: self.position_offset]:
+            duration += item.written_duration
+        duration -= int(duration)  # we care only about the remainder
+
+        # more space if we're at the very beginning
+        x_offset = 3 if self.position_offset == 0 else 1
+        for item in self.score[self.position_offset :]:
+            # TODO note splitting
+            if isinstance(item, abjad.Rest):
+                self.window.addstr(
+                    self.left_offset + x_offset,
+                    y_offset + 2,
+                    Notation.Rest.from_duration(item.written_duration),
+                    curses.A_UNDERLINE,
+                )
+            if isinstance(item, abjad.Chord):
+                pass  # TODO
+            if isinstance(item, abjad.Note):
+                pitch = item.written_pitch
+                octave = pitch.octave.number
+                name = pitch.name[0]
+
+                # magic
+                note_offset = -(octave * 7 + "cdefgab".index(name) - 2 * 17 + 1)
+
+                self.window.addstr(
+                    self.left_offset + x_offset,
+                    y_offset + note_offset // 2,
+                    Notation.Note.from_duration(item.written_duration),
+                    curses.A_UNDERLINE,
+                )
+
+                # if the note is directly on the line, add a ^ indicator
+                if note_offset % 2 == 0:
+                    self.window.addstr(
+                        self.left_offset + x_offset + 1,
+                        y_offset + note_offset // 2,
+                        "^",
+                        curses.A_UNDERLINE,
+                    )
+
+                    x_offset += 1
+
+            duration += item.written_duration
+            x_offset += 2
+
+            # draw breaks on full duration
+            if duration >= 1:
+                self.__draw_bar(self.left_offset + x_offset, y_offset + 1)
+                duration -= 1
+                x_offset += 2
+
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
         return [ClearStatusLineCommand(), self.get_file_name_command()]
+
+    def __draw_bar(self, x: int, y: int, bar: str = Notation.Bar.SINGLE):
+        """Draw a measure separator, starting from x, y."""
+        for i in range(4):
+            self.window.addstr(x, y + i, bar, curses.A_UNDERLINE | curses.A_BOLD)
 
 
 class Interface:
