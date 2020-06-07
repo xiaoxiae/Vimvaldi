@@ -78,3 +78,11 @@ class EditorCommand(Command):
 class InsertCommand(EditorCommand):
     """The command that gets passed to the editor to deal with."""
     text: str
+
+@dataclass
+class SetCommand(EditorCommand):
+    """Set something to something (clef, key, time...).
+    Either `:set something something` or `:set something=something`."""
+    option: str
+    value: str
+

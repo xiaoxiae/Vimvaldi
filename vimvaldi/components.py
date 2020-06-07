@@ -303,41 +303,58 @@ class StatusLine(Component):
                 command = text.strip()
                 command_parts = command.split()
 
+                # return if there isn't anything in the command line
+                if len(command_parts) == 0:
+                    return commands
+
+                # set command
+                if command_parts[0] == "set":
+                    rest = command[len(command_parts[0]) :].strip()
+
+                    # set a=b
+                    if rest.count("=") == 1:
+                        commands.append(SetCommand(*rest.split("=")))
+
+                    # set a b
+                    elif len(command_parts) >= 3:
+                        option = command_parts[1]
+                        value = rest[len(command_parts[1]) :].strip()
+
+                        commands.append(SetCommand(option, value))
+
                 # help and info screens from anywhere
                 if command in ("help", "info"):
                     commands.append(PushComponentCommand(command))
 
-                # TODO: rewrite this?
-                if len(command_parts) != 0:
-                    if command in ("q", "quit"):
-                        commands += [QuitCommand()]
+                if command in ("q", "quit"):
+                    commands += [QuitCommand()]
 
-                    if command in ("q!", "quit!"):
-                        commands += [QuitCommand(forced=True)]
+                if command in ("q!", "quit!"):
+                    commands += [QuitCommand(forced=True)]
 
-                    # whatever is left after anything after w is stripped
-                    possible_path = command[len(command_parts[0]) :].strip()
+                # whatever is left after anything after w is stripped
+                possible_path = command[len(command_parts[0]) :].strip()
 
-                    if command_parts[0] in ("w", "write"):
-                        commands += [SaveCommand(path=possible_path)]
+                if command_parts[0] in ("w", "write"):
+                    commands += [SaveCommand(path=possible_path)]
 
-                    if command_parts[0] in ("w!", "write!"):
-                        commands += [SaveCommand(forced=True, path=possible_path)]
+                if command_parts[0] in ("w!", "write!"):
+                    commands += [SaveCommand(forced=True, path=possible_path)]
 
-                    if command_parts[0] in ("o", "open"):
-                        commands += [OpenCommand(path=possible_path)]
+                if command_parts[0] in ("o", "open"):
+                    commands += [OpenCommand(path=possible_path)]
 
-                    if command_parts[0] in ("o!", "open!"):
-                        commands += [OpenCommand(forced=True, path=possible_path)]
+                if command_parts[0] in ("o!", "open!"):
+                    commands += [OpenCommand(forced=True, path=possible_path)]
 
-                    if command_parts[0] == "wq":
-                        commands += [SaveCommand(path=possible_path), QuitCommand()]
+                if command_parts[0] == "wq":
+                    commands += [SaveCommand(path=possible_path), QuitCommand()]
 
-                    if command_parts[0] == "wq!":
-                        commands += [
-                            SaveCommand(forced=True, path=possible_path),
-                            QuitCommand(),
-                        ]
+                if command_parts[0] == "wq!":
+                    commands += [
+                        SaveCommand(forced=True, path=possible_path),
+                        QuitCommand(),
+                    ]
 
             return commands
 
@@ -394,7 +411,7 @@ class Editor(Component):
             self.set_changed(True)
             self.position = max(0, self.position - 1)
 
-        if key in ("x"):
+        if key == "x":
             if self.position != len(self.score):
                 del self.score[self.position]
                 self.set_changed(True)
@@ -421,6 +438,36 @@ class Editor(Component):
 
         elif isinstance(command, OpenCommand):
             return self.__handle_open_command(command)
+
+        elif isinstance(command, SetCommand):
+            return self.__handle_set_command(command)
+
+    def __handle_set_command(self, command: SetCommand) -> List[Command]:
+        """Handle set commands."""
+        try:
+            if command.option == "clef":
+                self.clef = abjad.Clef(command.value)
+
+            if command.option == "time":
+                pair = command.value.split("/" if "/" in command.value else " ")
+                self.time = abjad.TimeSignature(tuple(map(int, pair)))
+
+            if command.option == "key":
+                self.key = abjad.KeySignature(*command.value.split(" "))
+
+        except Exception as e:
+            return [
+                SetStatusLineTextCommand(
+                    f"Could not parse '{command.value}' as '{command.option}'",
+                    Position.CENTER,
+                )
+            ]
+
+        return [
+            SetStatusLineTextCommand(
+                f"Invalid option '{command.option}'.", Position.CENTER
+            )
+        ]
 
     def __handle_insert_command(self, command: InsertCommand) -> List[Command]:
         """Attempt to parse whatever the InsertCommand contains. Return either [] if
