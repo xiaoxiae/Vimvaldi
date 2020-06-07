@@ -85,4 +85,3 @@ class SetCommand(EditorCommand):
     Either `:set something something` or `:set something=something`."""
     option: str
     value: str
-

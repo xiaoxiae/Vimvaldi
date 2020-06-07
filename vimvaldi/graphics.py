@@ -82,4 +82,3 @@ _:wq[!] [path]_                    | _:w_ and _:q[!]_ combined
 
 _:set opt val_ or _:set opt=val_     | set an option to a given value
                                  | example: 'set clef bass'"""
-

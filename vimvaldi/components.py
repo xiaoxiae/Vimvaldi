@@ -448,12 +448,19 @@ class Editor(Component):
             if command.option == "clef":
                 self.clef = abjad.Clef(command.value)
 
-            if command.option == "time":
+            elif command.option == "time":
                 pair = command.value.split("/" if "/" in command.value else " ")
                 self.time = abjad.TimeSignature(tuple(map(int, pair)))
 
-            if command.option == "key":
+            elif command.option == "key":
                 self.key = abjad.KeySignature(*command.value.split(" "))
+
+            else:
+                return [
+                    SetStatusLineTextCommand(
+                        f"Invalid option '{command.option}'.", Position.CENTER
+                    )
+                ]
 
         except Exception as e:
             return [
@@ -463,11 +470,7 @@ class Editor(Component):
                 )
             ]
 
-        return [
-            SetStatusLineTextCommand(
-                f"Invalid option '{command.option}'.", Position.CENTER
-            )
-        ]
+        return [SetStatusLineTextCommand(f"'{command.option}' set.", Position.CENTER,)]
 
     def __handle_insert_command(self, command: InsertCommand) -> List[Command]:
         """Attempt to parse whatever the InsertCommand contains. Return either [] if
