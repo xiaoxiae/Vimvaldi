@@ -51,18 +51,21 @@ The following page contains instructions on using the app.
 ## Controls
 
 ### General
-_k_ or _↑_          | up
-_j_ or _↓_          | down
-_h_ or _←_          | left
-_l_ or _→_          | right
-_CTRL-D_ \/ _CTRL-U_ | up\/down (faster)
+_k_ or _↑_          | move up
+_j_ or _↓_          | move down
+_h_ or _←_          | move left
+_l_ or _→_          | move right
+_CTRL-D_ \/ _CTRL-U_ | move up\/down faster
 _enter_           | confirm
 
 ### Help\/Info
 _q_ | exit
 
 ### Editor
-_TODO_
+_hl_ or _←→_ | move left\/right
+_i_        | insert item
+_x_        | delete a single item
+_._        | repeat the last insert command
 
 ## Commands
 Commands can be issued from nearly anywhere within the app by pressing _:_ and typing the respective command.
@@ -75,4 +78,8 @@ _:info_ | display the info page
 _:q[!]_ or _:quit[!]_                | quit [without saving]
 _:w[!] [path]_ or _:write[!] [path]_ | [forcibly] save [to the specified path]
 _:o[!] path_ or _:open[!] path_      | open file [discarding current]
-_:wq[!] [path]_                    | _:w_ and _:q[!]_ combined"""
+_:wq[!] [path]_                    | _:w_ and _:q[!]_ combined
+
+_:set opt val_ or _:set opt=val_     | set an option to a given value
+                                 | example: 'set clef bass'"""
+
