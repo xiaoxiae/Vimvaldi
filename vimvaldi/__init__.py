@@ -472,10 +472,10 @@ class DrawableEditor(Drawable, Editor):
             duration += item.written_duration
             x_offset += 2
 
-            # draw breaks on full duration
-            if duration >= 1:
+            # draw breaks on full duration (whatever the time is)
+            if duration >= self.time.duration:
                 self.__draw_bar(self.left_offset + x_offset, y_offset + 1)
-                duration -= 1
+                duration -= self.time.duration
                 x_offset += 2
 
         if self.cursor_position is None:
