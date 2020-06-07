@@ -506,14 +506,6 @@ class Interface:
                     MenuItem(
                         "EDIT", [PushComponentCommand("editor")], "Creates a new score."
                     ),
-                    MenuItem(
-                        "OPEN",
-                        [
-                            ToggleFocusCommand(),
-                            SetStatusLineTextCommand("open ", Position.LEFT),
-                        ],
-                        "Opens an existing score.",
-                    ),
                     None,
                     MenuItem(
                         "HELP",

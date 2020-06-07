@@ -490,7 +490,7 @@ class Editor(Component):
         # attempt to read the score from
         try:
             with open(path, "r") as f:
-                self.score = abjad.Score(f.read())
+                self.score = abjad.Score(f.read())[0]
 
             self.changed_since_saving = False
             self.current_file_path = path
