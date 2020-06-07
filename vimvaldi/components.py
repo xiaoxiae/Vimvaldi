@@ -132,7 +132,7 @@ class Menu(Component):
             self.__move_index(-3)
             return self.update_status_line()
 
-        if key in (curses.KEY_ENTER, "\n", "\r"):
+        if key in (curses.KEY_ENTER, "\n", "\r", "l", 261):
             return self.get_selected().commands
 
         if key == ":":
