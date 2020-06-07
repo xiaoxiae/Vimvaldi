@@ -386,6 +386,19 @@ class Editor(Component):
             self.set_changed(True)
             return self._handle_command(self.previous_repeatable_command)
 
+        if key in ("l", 261):
+            self.set_changed(True)
+            self.position = min(len(self.score), self.position + 1)
+
+        if key in ("h", 260):
+            self.set_changed(True)
+            self.position = max(0, self.position - 1)
+
+        if key in ("x"):
+            if self.position != len(self.score):
+                del self.score[self.position]
+                self.set_changed(True)
+
     def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
         it matches the self.current_file_path path. Returns the appropriate commands if it

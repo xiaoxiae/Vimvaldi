@@ -111,13 +111,6 @@ class Drawable(ABC, Changeable):
             self._draw()
             self.set_changed(False)
 
-        if self.is_focused():
-            if self.cursor_position is not None:
-                curses.curs_set(1)
-                self.window.move(*self.cursor_position)
-            else:
-                curses.curs_set(0)
-
 
 class DrawableMenu(Drawable, Menu):
     """A menu that can be drawn on the window."""
@@ -422,11 +415,17 @@ class DrawableEditor(Drawable, Editor):
             duration += item.written_duration
         duration -= int(duration)  # we care only about the remainder
 
+        self.cursor_position = None
+
         # more space if we're at the very beginning
         x_offset = 3 if self.position_offset == 0 else 1
-        for item in self.score[self.position_offset :]:
+
+        # draw notes
+        for i, item in enumerate(self.score[self.position_offset :]):
             # TODO note splitting
             if isinstance(item, abjad.Rest):
+                cursor_position = (self.left_offset + x_offset, y_offset + 2)
+
                 self.window.addstr(
                     self.left_offset + x_offset,
                     y_offset + 2,
@@ -442,6 +441,11 @@ class DrawableEditor(Drawable, Editor):
 
                 # magic
                 note_offset = -(octave * 7 + "cdefgab".index(name) - 2 * 17 + 1)
+
+                cursor_position = (
+                    self.left_offset + x_offset,
+                    y_offset + note_offset // 2,
+                )
 
                 self.window.addstr(
                     self.left_offset + x_offset,
@@ -461,6 +465,10 @@ class DrawableEditor(Drawable, Editor):
 
                     x_offset += 1
 
+            # adjust cursor
+            if i == self.position - self.position_offset:
+                self.cursor_position = cursor_position
+
             duration += item.written_duration
             x_offset += 2
 
@@ -469,6 +477,9 @@ class DrawableEditor(Drawable, Editor):
                 self.__draw_bar(self.left_offset + x_offset, y_offset + 1)
                 duration -= 1
                 x_offset += 2
+
+        if self.cursor_position is None:
+            self.cursor_position = (self.left_offset + x_offset, y_offset + 2)
 
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
@@ -535,7 +546,6 @@ class Interface:
             if not arguments.no_logo
             else [self.components["menu"]]
         )
-
         self.resolve_commands(self.component_stack[-1].set_focused(True))
 
         self.resize_windows()
@@ -571,6 +581,14 @@ class Interface:
                 # redraw the component and the status line
                 self.component_stack[-1].draw()
                 self.status_line.draw()
+
+                # move the cursor to the focused component's cursor position
+                focused_component = self.get_focused()
+                if focused_component.cursor_position is not None:
+                    curses.curs_set(1)
+                    focused_component.window.move(*focused_component.cursor_position)
+                else:
+                    curses.curs_set(0)
 
                 terminal_too_small = False
 

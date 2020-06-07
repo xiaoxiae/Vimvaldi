@@ -39,7 +39,12 @@ class Notation:
     class Time:
         COMMON = "𝄴"
 
-    class Note:
+    class Durationable:
+        @classmethod
+        def from_duration(cls, duration: abjad.Duration) -> str:
+            return from_duration(cls, duration)
+
+    class Note(Durationable):
         WHOLE = "𝅝"
         HALF = "𝅗𝅥"
         QUARTER = "𝅘𝅥"
@@ -48,11 +53,7 @@ class Notation:
         THIRTY_SECOND = "𝅘𝅥𝅰"
         SIXTY_FOURTH = "𝅘𝅥𝅱"
 
-        @classmethod
-        def from_duration(cls, duration: abjad.Duration) -> str:
-            return from_duration(cls, duration)
-
-    class Rest:
+    class Rest(Durationable):
         WHOLE = "𝄻"
         HALF = "𝄼"
         QUARTER = "𝄽"
