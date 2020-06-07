@@ -363,6 +363,8 @@ class Editor(Component):
         self.current_file_path = None  # the file to which to save
         self.changed_since_saving = False
 
+        self.previous_repeatable_command = None  # the previous command (to repeat on .)
+
     def get_score(self) -> abjad.Container:
         """Return the abjad container that stores the notes."""
         return self.score
@@ -379,6 +381,10 @@ class Editor(Component):
                 ToggleFocusCommand(),
                 SetStatusLineStateCommand(State.INSERT),
             ]
+
+        if key == ".":
+            self.set_changed(True)
+            return self._handle_command(self.previous_repeatable_command)
 
     def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
@@ -422,6 +428,8 @@ class Editor(Component):
             self.score.insert(self.position, obj)
             self.position += 1
             self.changed_since_saving = True
+
+            self.previous_repeatable_command = command
 
         except Exception as e:
             return [
