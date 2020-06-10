@@ -335,6 +335,12 @@ class StatusLine(Component):
                 # whatever is left after anything after w is stripped
                 possible_path = command[len(command_parts[0]) :].strip()
 
+                if command_parts[0] in ("n", "new"):
+                    commands += [NewCommand()]
+
+                if command_parts[0] in ("n!", "new!"):
+                    commands += [NewCommand(forced=True)]
+
                 if command_parts[0] in ("w", "write"):
                     commands += [SaveCommand(path=possible_path)]
 
@@ -368,6 +374,10 @@ class Editor(Component):
     """A class for working with the notesheet."""
 
     def __init__(self):
+        self.__initialize_score()
+
+    def __initialize_score(self):
+        """Initialize a default score."""
         # internal note representation (with some defaults)
         self.score = abjad.Score(simultaneous=False)
 
@@ -438,6 +448,9 @@ class Editor(Component):
 
         elif isinstance(command, OpenCommand):
             return self.__handle_open_command(command)
+
+        elif isinstance(command, NewCommand):
+            return self.__handle_new_command(command)
 
         elif isinstance(command, SetCommand):
             return self.__handle_set_command(command)
@@ -539,6 +552,13 @@ class Editor(Component):
             self.get_file_name_command(),
             SetStatusLineTextCommand("Saved.", Position.CENTER),
         ]
+
+    def __handle_new_command(self, command: NewCommand) -> List[Command]:
+        """Discard current work in favour of a new file."""
+        if self.changed_since_saving and not command.forced:
+            return [self.__get_unsaved_changes_warning()]
+
+        self.__initialize_score()
 
     def __handle_open_command(self, command: OpenCommand) -> List[Command]:
         """Attempt to open the specified file."""

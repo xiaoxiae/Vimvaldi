@@ -37,6 +37,11 @@ class OpenCommand(IOCommand):
     path: str = None
     forced: bool = False  # o! (overwrite currently open file)
 
+@dataclass
+class NewCommand(IOCommand):
+    """Throw away the currently edited file."""
+    forced: bool = False  # n!
+
 
 
 class ComponentCommand(Command):
