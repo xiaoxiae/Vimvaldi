@@ -368,128 +368,171 @@ class DrawableEditor(Drawable, Editor):
         self.position_offset = 0
 
     def _draw(self):
-        sheet_lines = 5  # number of lines in a note sheet
+        line_count = 5  # number of lines in a note sheet
 
         width = self.window.width()
         height = self.window.height()
 
         title_sheet_spacing = 3  # distance from the notesheet to the window title
 
-        # center the logo and the sheet horizontally
+        # offset to center the logo and the sheet horizontally
         center = center_coordinate(
-            height, sheet_lines + len(self.title.splitlines()) + title_sheet_spacing
+            height, line_count + len(self.title.splitlines()) + title_sheet_spacing
         )
 
         # draw the title of the menu
         for i, line in enumerate(self.title.splitlines()):
-            x_off = center_coordinate(width, len(line))
-            self.window.addstr(x_off, center + i, line)
+            self.window.addstr(center_coordinate(width, len(line)), center + i, line)
 
         # the offset to the first line of the note sheet
-        y_offset = center + len(self.title.splitlines()) + title_sheet_spacing
+        y_start = center + len(self.title.splitlines()) + title_sheet_spacing
 
         # draw the sheet lines
         for x in range(self.left_offset, width - self.right_offset):
-            for y in range(sheet_lines):
-                y += y_offset
+            for y in range(line_count):
+                y += y_start
                 self.window.addstr(x, y, " ", curses.A_UNDERLINE)
 
         # time signature
         time = f"{self.time.numerator}/{self.time.denominator}"
-        self.window.addstr(self.right_offset, y_offset + 1, time)
+        self.window.addstr(self.right_offset, y_start + 1, time)
 
         # clef
         clef = getattr(Notation.Clef, self.clef.name.upper())
-        self.window.addstr(self.right_offset + 6, y_offset + 1, clef)
+        self.window.addstr(self.right_offset + 6, y_start + 1, clef)
 
         # key
-        self.window.addstr(self.right_offset, y_offset + 4, self.key.name)
+        self.window.addstr(self.right_offset, y_start + 4, self.key.name)
 
         # the starting measure (only if we're at the very beginning)
         if self.position_offset == 0:
-            self.__draw_bar(self.left_offset + 1, y_offset + 1, Notation.Bar.DOUBLE)
+            self.__draw_bar(self.left_offset + 1, y_start + 1, Notation.Bar.DOUBLE)
 
         # find the sum of durations of notes that aren't currently displayed
         duration = abjad.Duration()
         for item in self.score[: self.position_offset]:
             duration += item.written_duration
-        duration -= int(duration)  # we care only about the remainder
+        duration -= int(duration)  # TODO: use time -- this is wrong!
 
         self.cursor_position = None
 
         # more space if we're at the very beginning
-        x_offset = 3 if self.position_offset == 0 else 1
+        x_start = 3 if self.position_offset == 0 else 1
+        position = self.position
+
+        # duplicate the note sheet since we might be inserting new notes (if it so
+        # happens that they don't fit the measures)
+        items = list(self.score[self.position_offset :])
 
         # draw notes
-        for i, item in enumerate(self.score[self.position_offset :]):
-            # TODO note splitting
-            if isinstance(item, abjad.Rest):
-                cursor_position = (self.left_offset + x_offset, y_offset + 2)
+        i = 0
+        while i < len(items):
+            item = items[i]
 
-                self.window.addstr(
-                    self.left_offset + x_offset,
-                    y_offset + 2,
-                    Notation.Rest.from_duration(item.written_duration),
-                    curses.A_UNDERLINE,
-                )
-            if isinstance(item, abjad.Chord):
+            # split if the duration extends over the measure
+            split_offset = 0
+            if duration + item.written_duration > self.time.duration:
+                split = self.__split_to_duration(item, self.time.duration - duration)
+                split_offset = len(split) - 1  # the number of newly created notes
+
+                # replace notes
+                items = items[:i] + split + items[i + 1 :]
+                item = items[i]
+
+            if isinstance(item, abjad.Rest):  # draw rests
+                pos = (self.left_offset + x_start, y_start + 2)
+
+                cursor_position = pos
+                self.__draw_rest(*pos, item.written_duration)
+
+            if isinstance(item, abjad.Chord):  # draw chords
                 pass  # TODO
-            if isinstance(item, abjad.Note):
+
+            if isinstance(item, abjad.Note):  # draw notes
+                # things for determining the note offset to draw it properly
                 pitch = item.written_pitch
                 octave = pitch.octave.number
                 name = pitch.name[0]
 
                 # magic
                 note_offset = -(octave * 7 + "cdefgab".index(name) - 2 * 17 + 1)
+                in_the_middle = note_offset % 2 == 0  # whether it's between lines
 
-                cursor_position = (
-                    self.left_offset + x_offset,
-                    y_offset + note_offset // 2,
-                )
+                pos = (self.left_offset + x_start, y_start + note_offset // 2)
 
-                self.window.addstr(
-                    self.left_offset + x_offset,
-                    y_offset + note_offset // 2,
-                    Notation.Note.from_duration(item.written_duration),
-                    curses.A_UNDERLINE,
-                )
+                cursor_position = pos
+                self.__draw_note(*pos, item.written_duration, in_the_middle)
 
-                # if the note is directly on the line, add a ^ indicator
-                if note_offset % 2 == 0:
-                    self.window.addstr(
-                        self.left_offset + x_offset + 1,
-                        y_offset + note_offset // 2,
-                        "^",
-                        curses.A_UNDERLINE,
-                    )
+                if in_the_middle:
+                    x_start += 1
 
-                    x_offset += 1
-
-            # adjust cursor
-            if i == self.position - self.position_offset:
+            # adjust cursor, if we're drawing the currently selected note
+            if (
+                i == position - self.position_offset
+                and self.cursor_position is None
+            ):
                 self.cursor_position = cursor_position
 
-            duration += item.written_duration
-            x_offset += 2
+            position += split_offset
 
-            # draw breaks on full duration (whatever the time is)
+            duration += item.written_duration
+            x_start += 2
+
+            # draw breaks on full duration
             if duration >= self.time.duration:
-                self.__draw_bar(self.left_offset + x_offset, y_offset + 1)
+                self.__draw_bar(self.left_offset + x_start, y_start + 1)
                 duration -= self.time.duration
-                x_offset += 2
+                x_start += 2
+
+            i += 1
 
         if self.cursor_position is None:
-            self.cursor_position = (self.left_offset + x_offset, y_offset + 2)
+            self.cursor_position = (self.left_offset + x_start, y_start + 2)
 
     def set_focused(self, value: bool) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
         return [ClearStatusLineCommand(), self.get_file_name_command()]
 
+    def __draw_note(self, x, y, duration, in_the_middle: bool):
+        """Draw a note at the given position."""
+        self.window.addstr(
+            x, y, Notation.Note.from_duration(duration), curses.A_UNDERLINE
+        )
+
+        # if the note is directly on the line, add a ^ indicator (since we can't really
+        # draw a note midway through the line
+        if in_the_middle:
+            self.window.addstr(x + 1, y, "^", curses.A_UNDERLINE)
+
+    def __draw_rest(self, x, y, duration):
+        """Draw a rest at the given position."""
+        self.window.addstr(
+            x, y, Notation.Rest.from_duration(duration), curses.A_UNDERLINE
+        )
+
     def __draw_bar(self, x: int, y: int, bar: str = Notation.Bar.SINGLE):
         """Draw a measure separator, starting from x, y."""
         for i in range(4):
             self.window.addstr(x, y + i, bar, curses.A_UNDERLINE | curses.A_BOLD)
+
+    def __split_to_duration(self, item, duration: abjad.Duration):
+        items = []
+        total_duration = item.written_duration
+
+        while duration != 0:
+            new_item = type(item)(item)
+            new_item.written_duration = duration.equal_or_lesser_power_of_two
+
+            items.append(new_item)
+
+            total_duration -= duration.equal_or_lesser_power_of_two
+            duration -= duration.equal_or_lesser_power_of_two
+
+        remaining_item = type(item)(item)
+        remaining_item.written_duration = total_duration
+
+        return items + [remaining_item]
 
 
 class Interface:
