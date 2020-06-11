@@ -63,7 +63,7 @@ _q_ | exit
 
 ### Editor
 _hl_ or _←→_ | move left\/right
-_i_        | insert item
+_i_        | insert item (see Insert syntax below)
 _x_        | delete a single item
 _p_        | paste last deleted item
 _._        | repeat the last insert command
@@ -82,4 +82,18 @@ _:o[!] path_ or _:open[!] path_      | open file [discarding current]
 _:wq[!] [path]_                    | _:w_ and _:q[!]_ combined
 
 _:set opt val_ or _:set opt=val_     | set an option to a given value
-                                 | example: 'set clef bass'"""
+                                 | options: key pitch scale | 'set key c major'
+                                 |          clef name       | 'set clef treble'
+                                 |          time num\/den    | 'set time 4/4' 
+
+## Insert syntax
+The syntax follows LilyPond's notation the currently supported things to insert are:
+- notes: _lilypond.org\/Documentation\/notation\/pitches_
+    - examples:
+        - _c_ for quarter C4
+        - _c2_ for half C4
+        - _c''_ for C6
+- rests: _lilypond.org\/Documentation\/notation\/writing-rests_
+    - example:
+        - _r_ for quarter rest, _r2_ for half rest...
+"""

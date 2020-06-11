@@ -436,7 +436,6 @@ class Editor(Component):
                 self.position += 1
                 self.set_changed(True)
 
-
     def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
         it matches the self.current_file_path path. Returns the appropriate commands if it
