@@ -10,12 +10,14 @@ from abc import ABC, abstractmethod
 from typing import *
 from signal import signal, SIGINT
 
+# for suppressing Abjad messages
+sys.stdout = open(os.devnull, "w")
+
 import abjad
 
 from vimvaldi.commands import *
 
-
-# TODO remove -- just for debug
+# for debug
 logging.basicConfig(filename="vimvaldi.log", level=logging.DEBUG)
 print = logging.info
 
