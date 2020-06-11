@@ -65,6 +65,7 @@ _q_ | exit
 _hl_ or _←→_ | move left\/right
 _i_        | insert item
 _x_        | delete a single item
+_p_        | paste last deleted item
 _._        | repeat the last insert command
 
 ## Commands

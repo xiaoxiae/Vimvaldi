@@ -394,6 +394,8 @@ class Editor(Component):
 
         self.previous_repeatable_command = None  # the previous command (to repeat on .)
 
+        self.deleted_items = []  # last deleted items (to be possibly pasted back)
+
     def get_score(self) -> abjad.Container:
         """Return the abjad container that stores the notes."""
         return self.score
@@ -425,8 +427,15 @@ class Editor(Component):
 
         if key == "x":
             if self.position != len(self.score):
-                del self.score[self.position]
+                self.deleted_items = [self.score.pop(self.position)]
                 self.set_changed(True)
+
+        if key == "p":
+            for item in self.deleted_items:
+                self.score.insert(self.position, type(item)(item))
+                self.position += 1
+                self.set_changed(True)
+
 
     def __save_path_valid(self, path: str) -> List[Command]:
         """Checks, whether we can save to this path -- if it either doesn't exist or
