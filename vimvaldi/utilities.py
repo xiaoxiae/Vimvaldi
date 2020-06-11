@@ -29,12 +29,6 @@ def pop_char(string: str) -> Tuple[str, str]:
         return string[0], string[1:]
 
 
-def draw_vertical_bar(window, x: int, y_s: int, y_e: int):
-    """Draw the vertial bar on the window (with underlines!)."""
-    for i in range(y_s, y_e):
-        window.addstr(i, x, "|", curses.A_UNDERLINE)
-
-
 class Position(Enum):
     """For left/midde/right."""
 

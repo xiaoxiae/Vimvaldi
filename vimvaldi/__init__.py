@@ -467,10 +467,7 @@ class DrawableEditor(Drawable, Editor):
                     x_start += 1
 
             # adjust cursor, if we're drawing the currently selected note
-            if (
-                i == position - self.position_offset
-                and self.cursor_position is None
-            ):
+            if i == position - self.position_offset and self.cursor_position is None:
                 self.cursor_position = cursor_position
 
             position += split_offset
@@ -572,9 +569,7 @@ class Interface:
                         "Shows information about the program.",
                     ),
                     None,
-                    MenuItem(
-                        "QUIT", [PopComponentCommand()], "Terminates the program."
-                    ),
+                    MenuItem("QUIT", [QuitCommand()], "Terminates the program."),
                 ],
             ),
             "info": DrawableTextDisplay(self.main_window, info_text),

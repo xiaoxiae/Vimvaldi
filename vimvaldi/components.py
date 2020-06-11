@@ -66,7 +66,7 @@ class MenuItem:
     """A class for representing an item of a menu."""
 
     label: str
-    commands: List[Command]
+    commands: List[Command]  # which command to send in response to pressing this item
     tooltip: str
 
 
@@ -115,7 +115,7 @@ class Menu(Component):
     def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
-            return [PopComponentCommand()]
+            quit()
 
     def _handle_keypress(self, key) -> Optional[List[Command]]:
         if key in ("j", 258):
@@ -158,7 +158,7 @@ class LogoDisplay(Component):
     def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
-            return [PopComponentCommand()]
+            quit()
 
 
 class TextDisplay(Component):
@@ -173,7 +173,7 @@ class TextDisplay(Component):
     def _handle_command(self, command: Command) -> Optional[List[Command]]:
         """React to Quit command by quitting."""
         if isinstance(command, QuitCommand):
-            return [PopComponentCommand()]
+            quit()
 
     def _handle_keypress(self, key) -> Optional[List[Command]]:
         if key in ("j", curses.KEY_ENTER, "\n", "\r"):
@@ -601,11 +601,10 @@ class Editor(Component):
     def __handle_quit_command(self, command: QuitCommand) -> List[Command]:
         """Quit (if there are either no unsaved changes or the command is forced), else
         warn about there being unsaved changes."""
-        return (
-            [PopComponentCommand()]
-            if not self.changed_since_saving or command.forced
-            else [self.__get_unsaved_changes_warning()]
-        )
+        if not self.changed_since_saving or command.forced:
+            quit()
+
+        return [self.__get_unsaved_changes_warning()]
 
     def __get_unsaved_changes_warning(self) -> Command:
         """Return the warning command issued when there are unsaved changes."""
