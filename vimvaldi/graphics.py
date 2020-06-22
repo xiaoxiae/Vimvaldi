@@ -76,6 +76,7 @@ _:help_ | display this page
 _:info_ | display the info page
 
 ### Editor
+_:n[!]_ or _:new[!]_                 | reset score
 _:q[!]_ or _:quit[!]_                | quit [without saving]
 _:w[!] [path]_ or _:write[!] [path]_ | [forcibly] save [to the specified path]
 _:o[!] path_ or _:open[!] path_      | open file [discarding current]
