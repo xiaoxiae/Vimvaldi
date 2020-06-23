@@ -630,7 +630,7 @@ class Interface:
 
                 terminal_too_small = False
 
-            except curses.error:
+            except Exception as e:
                 # TODO better error handling
                 height, width = self.window.getmaxyx()
 
