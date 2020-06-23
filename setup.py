@@ -6,7 +6,7 @@ script_location = path.abspath(path.dirname(__file__))
 setup(
     # information about the package
     name="vimvaldi",
-    version="0.1",
+    version="0.1.1",
     author="Tomáš Sláma",
     author_email="tomas@slama.dev",
     keywords="notes notesheet editor curses",
