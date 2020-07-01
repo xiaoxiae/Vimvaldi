@@ -504,17 +504,26 @@ class Editor(Component):
             return
 
         try:
-            if text[0] == "r":
-                obj = abjad.Rest(text)
-            elif text[0] == "<":
-                obj = abjad.Chord(text)
-            else:
-                obj = abjad.Note(text)
+            # objects to add
+            objects = []
 
-            self.score.insert(self.position, obj)
-            self.position += 1
+            for item in text.split(";"):
+                item = item.strip()
+
+                if item[0] == "r":
+                    obj = abjad.Rest(item)
+                elif item[0] == "<":
+                    obj = abjad.Chord(item)
+                else:
+                    obj = abjad.Note(item)
+
+                objects.append(obj)
+
+            for obj in objects:
+                self.score.insert(self.position, obj)
+                self.position += 1
+
             self.changed_since_saving = True
-
             self.previous_repeatable_command = command
 
         except Exception as e:
