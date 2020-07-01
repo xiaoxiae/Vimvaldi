@@ -81,11 +81,11 @@ class Drawable(ABC, Changeable):
     def __init__(self, window: WindowView):
         self.window = window
 
-    def toggle_focused(self) -> List[Command]:
+    def toggle_focused(self, suppress_clear=False) -> List[Command]:
         """Toggle the focus on this Drawable."""
-        return self.set_focused(not self.focused)
+        return self.set_focused(not self.focused, suppress_clear)
 
-    def set_focused(self, value: bool) -> List[Command]:
+    def set_focused(self, value: bool, suppress_clear=False) -> List[Command]:
         """Set the focus on this Drawable. Possibly return a command if the component
         wants to do some action (they will override it)."""
         self.focused = value
@@ -149,7 +149,7 @@ class DrawableMenu(Drawable, Menu):
             x_off = center_coordinate(self.window.width(), len(text))
             self.window.addstr(x_off, y_off + len(lines) + 2 + i, text)
 
-    def set_focused(self, value: bool) -> List[Command]:
+    def set_focused(self, value: bool, suppress_clear=False) -> List[Command]:
         """If the focus switched to the menu, set the status line according to the
         currently selected item."""
         Drawable.set_focused(self, value)
@@ -295,9 +295,11 @@ class DrawableTextDisplay(Drawable, TextDisplay):
             h_level = 0
             y += 1
 
-    def set_focused(self, value: bool) -> List[Command]:
+    def set_focused(self, value: bool, suppress_clear=False) -> List[Command]:
         Drawable.set_focused(self, value)
-        return [ClearStatusLineCommand()]
+
+        if not suppress_clear:
+            return [ClearStatusLineCommand()]
 
     def _handle_keypress(self, key) -> Optional[List[Command]]:
         """Expanded because TextDisplay couldn't easily implement ^D and ^U, since it
@@ -486,10 +488,14 @@ class DrawableEditor(Drawable, Editor):
         if self.cursor_position is None:
             self.cursor_position = (self.left_offset + x_start, y_start + 2)
 
-    def set_focused(self, value: bool) -> List[Command]:
+    def set_focused(self, value: bool, suppress_clear=False) -> List[Command]:
         """For setting status line information."""
         Drawable.set_focused(self, value)
-        return [ClearStatusLineCommand(), self.get_file_name_command()]
+
+        if suppress_clear:
+            return [self.get_file_name_command()]
+        else:
+            return [ClearStatusLineCommand(), self.get_file_name_command()]
 
     def __draw_note(self, x, y, duration, in_the_middle: bool):
         """Draw a note at the given position."""
@@ -676,8 +682,8 @@ class Interface:
 
             # toggle focus
             elif isinstance(command, ToggleFocusCommand):
-                commands += self.status_line.toggle_focused()
-                commands += self.component_stack[-1].toggle_focused()
+                commands += self.status_line.toggle_focused(command.suppress_clear)
+                commands += self.component_stack[-1].toggle_focused(command.suppress_clear)
 
             # status line things
             elif isinstance(command, StatusLineCommand):

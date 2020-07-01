@@ -324,6 +324,15 @@ class StatusLine(Component):
 
                         commands.append(SetCommand(option, value))
 
+                    else:
+                        commands[0].suppress_clear = True
+
+                        return commands + [
+                            SetStatusLineTextCommand(
+                                "Invalid 'set' format.", Position.CENTER
+                            )
+                        ]
+
                 # help and info screens from anywhere
                 if command in ("help", "info"):
                     commands.append(PushComponentCommand(command))

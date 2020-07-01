@@ -14,8 +14,11 @@ class GeneralCommand(Command):
     """Other commands that didn't really fit anywhere else."""
 
 
+@dataclass
 class ToggleFocusCommand(GeneralCommand):
     """A command to toggle focus from the status line to the current main component."""
+
+    suppress_clear = False
 
 
 class IOCommand(Command):
