@@ -88,13 +88,20 @@ _:set opt val_ or _:set opt=val_     | set an option to a given value
                                  |          time num\/den    | 'set time 4/4' 
 
 ## Insert syntax
-The syntax follows LilyPond's notation the currently supported things to insert are:
-- notes: _lilypond.org\/Documentation\/notation\/pitches_
+The syntax of the insert command follows LilyPond's notation. Currently supported items to insert are:
+- *notes*: _lilypond.org\/Documentation\/notation\/pitches_
     - examples:
         - _c_ for quarter C4
         - _c2_ for half C4
         - _c''_ for C6
-- rests: _lilypond.org\/Documentation\/notation\/writing-rests_
+- *rests*: _lilypond.org\/Documentation\/notation\/writing-rests_
     - example:
         - _r_ for quarter rest, _r2_ for half rest...
+
+For adding multiple notes/rests in a single insert (if you wish, for example, to repeat the command in the future), simply insert ';' in the middle:
+- _c;d;e;f_ will insert 4 notes
+- _c;r4;r2_ will insert a note and two rests
+
+## Output file syntax
+Vimvaldi outputs the note sheets in the standard LilyPond syntax.
 """
