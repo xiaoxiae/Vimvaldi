@@ -85,7 +85,7 @@ _:wq[!] [path]_                    | _:w_ and _:q[!]_ combined
 _:set opt val_ or _:set opt=val_     | set an option to a given value
                                  | options: key pitch scale | 'set key c major'
                                  |          clef name       | 'set clef treble'
-                                 |          time num\/den    | 'set time 4/4' 
+                                 |          time num\/den    | 'set time 4\/4' 
 
 ## Insert syntax
 The syntax of the insert command follows LilyPond's notation. Currently supported items to insert are:
@@ -98,10 +98,12 @@ The syntax of the insert command follows LilyPond's notation. Currently supporte
     - example:
         - _r_ for quarter rest, _r2_ for half rest...
 
-For adding multiple notes/rests in a single insert (if you wish, for example, to repeat the command in the future), simply insert ';' in the middle:
+For adding multiple notes\/rests in a single insert (if you wish, for example, to repeat the command in the future), simply insert ';' in the middle:
 - _c;d;e;f_ will insert 4 notes
 - _c;r4;r2_ will insert a note and two rests
 
 ## Output file syntax
-Vimvaldi outputs the note sheets in the standard LilyPond syntax.
+Vimvaldi outputs the note sheets in the standard LilyPond file syntax. This means that running `lilypond <file name>` will produce a nice-looking PDF :).
+
+To read more, visit _http:\/\/lilypond.org\/_.
 """
